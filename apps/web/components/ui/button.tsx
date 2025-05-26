@@ -59,6 +59,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         {...(props as any)}
       />
     );

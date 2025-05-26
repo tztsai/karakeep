@@ -22,6 +22,7 @@ import UnknownCard from "./UnknownCard";
 function StyledBookmarkCard({ children }: { children: React.ReactNode }) {
   return (
     <Slot className="mb-4 border border-border bg-card duration-300 ease-in hover:shadow-lg hover:transition-all">
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       {children as any}
     </Slot>
   );
