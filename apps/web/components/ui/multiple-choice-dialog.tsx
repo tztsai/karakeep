@@ -40,7 +40,7 @@ export default function MultipleChoiceDialog({
         setDialogOpen(isOpen);
       }}
     >
-      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
+      {children ? <DialogTrigger asChild>{children}</DialogTrigger> : null}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

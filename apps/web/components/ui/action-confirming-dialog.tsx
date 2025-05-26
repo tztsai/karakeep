@@ -35,7 +35,7 @@ export default function ActionConfirmingDialog({
   ];
   return (
     <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
+      {children ? <DialogTrigger asChild>{children}</DialogTrigger> : null}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

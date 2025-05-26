@@ -118,7 +118,7 @@ export function MergeListModal({
         setOpen(s);
       }}
     >
-      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
+      {children ? <DialogTrigger asChild>{children}</DialogTrigger> : null}
       <DialogContent>
         <Form {...form}>
           <form onSubmit={onSubmit}>
