@@ -179,6 +179,10 @@ export class CrawlerWorker {
     }
 
     logger.info("Starting crawler worker ...");
+    logger.info(
+      `[Crawler] Worker configuration: pollIntervalMs=1000, concurrency=${serverConfig.crawler.numWorkers}, timeoutSecs=${serverConfig.crawler.jobTimeoutSec}`,
+    );
+
     const worker = new Runner<ZCrawlLinkRequest>(
       LinkCrawlerQueue,
       {
@@ -211,6 +215,18 @@ export class CrawlerWorker {
         concurrency: serverConfig.crawler.numWorkers,
       },
     );
+
+    // Add periodic queue status logging
+    setInterval(async () => {
+      try {
+        const queueStats = await LinkCrawlerQueue.stats();
+        logger.info(
+          `[Crawler] Queue stats: pending=${queueStats.pending}, pending_retry=${queueStats.pending_retry}, running=${queueStats.running}, failed=${queueStats.failed}`,
+        );
+      } catch (e) {
+        logger.error(`[Crawler] Failed to get queue stats: ${e}`);
+      }
+    }, 30000); // Log every 30 seconds
 
     return worker;
   }
@@ -791,6 +807,10 @@ async function crawlAndParseUrl(
 async function runCrawler(job: DequeuedJob<ZCrawlLinkRequest>) {
   const jobId = job.id ?? "unknown";
 
+  logger.info(
+    `[Crawler][${jobId}] Job dequeued and starting processing. Job data: ${JSON.stringify(job.data)}`,
+  );
+
   const request = zCrawlLinkRequestSchema.safeParse(job.data);
   if (!request.success) {
     logger.error(
@@ -799,7 +819,14 @@ async function runCrawler(job: DequeuedJob<ZCrawlLinkRequest>) {
     return;
   }
 
+  logger.info(`[Crawler][${jobId}] Job validation successful`);
+
   const { bookmarkId, archiveFullPage } = request.data;
+
+  logger.info(
+    `[Crawler][${jobId}] Getting bookmark details for bookmarkId: ${bookmarkId}`,
+  );
+
   const {
     url,
     userId,
@@ -820,6 +847,9 @@ async function runCrawler(job: DequeuedJob<ZCrawlLinkRequest>) {
   const isPdf = contentType === ASSET_TYPES.APPLICATION_PDF;
 
   if (isPdf) {
+    logger.info(
+      `[Crawler][${jobId}] Detected PDF content, handling as asset bookmark`,
+    );
     await handleAsAssetBookmark(
       url,
       "pdf",
@@ -833,6 +863,9 @@ async function runCrawler(job: DequeuedJob<ZCrawlLinkRequest>) {
     IMAGE_ASSET_TYPES.has(contentType) &&
     SUPPORTED_UPLOAD_ASSET_TYPES.has(contentType)
   ) {
+    logger.info(
+      `[Crawler][${jobId}] Detected image content, handling as asset bookmark`,
+    );
     await handleAsAssetBookmark(
       url,
       "image",
@@ -842,6 +875,7 @@ async function runCrawler(job: DequeuedJob<ZCrawlLinkRequest>) {
       job.abortSignal,
     );
   } else {
+    logger.info(`[Crawler][${jobId}] Processing as regular webpage`);
     const archivalLogic = await crawlAndParseUrl(
       url,
       userId,
@@ -857,6 +891,9 @@ async function runCrawler(job: DequeuedJob<ZCrawlLinkRequest>) {
 
     // Enqueue openai job (if not set, assume it's true for backward compatibility)
     if (job.data.runInference !== false) {
+      logger.info(
+        `[Crawler][${jobId}] Enqueueing OpenAI jobs for tagging and summarization`,
+      );
       await OpenAIQueue.enqueue({
         bookmarkId,
         type: "tag",
@@ -868,15 +905,21 @@ async function runCrawler(job: DequeuedJob<ZCrawlLinkRequest>) {
     }
 
     // Update the search index
+    logger.info(`[Crawler][${jobId}] Triggering search reindex`);
     await triggerSearchReindex(bookmarkId);
 
     // Trigger a potential download of a video from the URL
+    logger.info(`[Crawler][${jobId}] Triggering video worker`);
     await triggerVideoWorker(bookmarkId, url);
 
     // Trigger a webhook
+    logger.info(`[Crawler][${jobId}] Triggering webhook`);
     await triggerWebhook(bookmarkId, "crawled");
 
     // Do the archival as a separate last step as it has the potential for failure
+    logger.info(`[Crawler][${jobId}] Running archival logic`);
     await archivalLogic();
   }
+
+  logger.info(`[Crawler][${jobId}] Job processing completed successfully`);
 }

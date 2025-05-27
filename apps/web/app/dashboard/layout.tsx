@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Highlighter,
   Home,
+  Radio,
   Search,
   Tag,
 } from "lucide-react";
@@ -52,6 +53,11 @@ export default async function Dashboard({
             },
           ]
         : [],
+      {
+        name: t("common.channels"),
+        icon: <Radio size={18} />,
+        path: "/dashboard/channels",
+      },
       {
         name: t("common.tags"),
         icon: <Tag size={18} />,

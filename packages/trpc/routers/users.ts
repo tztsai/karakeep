@@ -183,7 +183,9 @@ export const usersAppRouter = router({
       await deleteUserAssets({ userId: input.userId });
     }),
   whoami: authedProcedure
-    .output(zWhoAmIResponseSchema)
+    .output(
+      zWhoAmIResponseSchema.extend({ readwiseToken: z.string().nullable() }),
+    )
     .query(async ({ ctx }) => {
       if (!ctx.user.email) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -194,7 +196,23 @@ export const usersAppRouter = router({
       if (!userDb) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
-      return { id: ctx.user.id, name: ctx.user.name, email: ctx.user.email };
+      return {
+        id: ctx.user.id,
+        name: ctx.user.name,
+        email: ctx.user.email,
+        readwiseToken: userDb.readwiseToken,
+      };
+    }),
+
+  updateReadwiseToken: authedProcedure
+    .input(z.object({ token: z.string().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(users)
+        .set({ readwiseToken: input.token })
+        .where(eq(users.id, ctx.user.id));
+
+      return { success: true };
     }),
   stats: authedProcedure
     .output(zUserStatsResponseSchema)

@@ -5,7 +5,7 @@ import { zBookmarkTagSchema } from "./tags";
 
 const MAX_TITLE_LENGTH = 1000;
 
-export const enum BookmarkTypes {
+export enum BookmarkTypes {
   LINK = "link",
   TEXT = "text",
   ASSET = "asset",

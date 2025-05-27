@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 import { BookmarkTypes } from "@karakeep/shared/types/bookmarks";
+import { ReadwiseImportTypes } from "@karakeep/shared/types/readwise";
 
 function createdAtField() {
   return integer("createdAt", { mode: "timestamp" })
@@ -38,6 +39,7 @@ export const users = sqliteTable("user", {
   password: text("password"),
   salt: text("salt").notNull().default(""),
   role: text("role", { enum: ["admin", "user"] }).default("user"),
+  readwiseToken: text("readwiseToken"),
 });
 
 export const accounts = sqliteTable(
@@ -445,6 +447,75 @@ export const rssFeedImportsTable = sqliteTable(
     index("rssFeedImports_feedIdIdx_idx").on(bl.rssFeedId),
     index("rssFeedImports_entryIdIdx_idx").on(bl.entryId),
     unique().on(bl.rssFeedId, bl.entryId),
+  ],
+);
+
+export const readwiseTable = sqliteTable(
+  "readwise",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    createdAt: createdAtField(),
+    lastFetchedAt: integer("lastFetchedAt", { mode: "timestamp" }),
+    lastFetchedStatus: text("lastFetchedStatus", {
+      enum: ["pending", "failure", "success"],
+    }).default("pending"),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type", { enum: [
+      ReadwiseImportTypes.HIGHLIGHTS,
+      ReadwiseImportTypes.DOCUMENTS
+    ] }).notNull(),
+    itemCount: integer("itemCount").notNull(),
+  },
+  (bl) => [index("readwise_userId_idx").on(bl.userId)],
+);
+
+export const readwiseBooks = sqliteTable(
+  "readwiseBooks",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    readwiseBookId: integer("readwiseBookId").notNull(),
+    bookmarkId: text("bookmarkId")
+      .notNull()
+      .references(() => bookmarks.id, { onDelete: "cascade" }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAtField(),
+  },
+  (rb) => [
+    index("readwiseBooks_userId_idx").on(rb.userId),
+    unique().on(rb.userId, rb.readwiseBookId),
+  ],
+);
+
+export const readwiseHighlights = sqliteTable(
+  "readwiseHighlights",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    readwiseHighlightId: integer("readwiseHighlightId").notNull(),
+    highlightId: text("highlightId")
+      .notNull()
+      .references(() => highlights.id, { onDelete: "cascade" }),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAtField(),
+  },
+  (rh) => [
+    index("readwiseHighlights_userId_idx").on(rh.userId),
+    unique().on(rh.userId, rh.readwiseHighlightId),
   ],
 );
 

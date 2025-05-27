@@ -1,4 +1,4 @@
 pnpm typecheck
-pnpm format --check
+pnpm format:fix
 pnpm lint
 pnpm exec sherif

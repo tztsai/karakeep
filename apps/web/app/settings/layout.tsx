@@ -6,6 +6,7 @@ import { api } from "@/server/api/client";
 import { TFunction } from "i18next";
 import {
   ArrowLeft,
+  BookOpen,
   Download,
   GitBranch,
   Image,
@@ -43,6 +44,11 @@ const settingsSidebarItems = (
     name: t("settings.feeds.rss_subscriptions"),
     icon: <Rss size={18} />,
     path: "/settings/feeds",
+  },
+  {
+    name: t("settings.readwise.readwise_integration"),
+    icon: <BookOpen size={18} />,
+    path: "/settings/readwise",
   },
   {
     name: t("settings.import.import_export"),

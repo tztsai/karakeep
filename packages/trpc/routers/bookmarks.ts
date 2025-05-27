@@ -40,6 +40,7 @@ import {
 } from "@karakeep/shared/assetdb";
 import serverConfig from "@karakeep/shared/config";
 import { InferenceClientFactory } from "@karakeep/shared/inference";
+import logger from "@karakeep/shared/logger";
 import { buildSummaryPrompt } from "@karakeep/shared/prompts";
 import {
   AssetPreprocessingQueue,
@@ -412,9 +413,15 @@ export const bookmarksAppRouter = router({
       switch (bookmark.content.type) {
         case BookmarkTypes.LINK: {
           // The crawling job triggers openai when it's done
+          logger.info(
+            `[BookmarkCreation] Enqueueing crawler job for bookmark ${bookmark.id} with URL: ${bookmark.content.url}`,
+          );
           await LinkCrawlerQueue.enqueue({
             bookmarkId: bookmark.id,
           });
+          logger.info(
+            `[BookmarkCreation] Successfully enqueued crawler job for bookmark ${bookmark.id}`,
+          );
           break;
         }
         case BookmarkTypes.TEXT: {

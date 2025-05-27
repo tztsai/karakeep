@@ -23,6 +23,7 @@
     "note": "Note",
     "attachments": "Attachments",
     "highlights": "Highlights",
+    "channels": "Channels",
     "source": "Source",
     "screenshot": "Screenshot",
     "video": "Video",
@@ -124,6 +125,10 @@
       "add_a_subscription": "Add a Subscription",
       "feed_enabled": "RSS Feed enabled",
       "feed_disabled": "RSS Feed disabled"
+    },
+    "readwise": {
+      "readwise_integration": "Readwise Integration",
+      "description": "Readwise integration settings will be available here. This allows you to sync your highlights and articles from Readwise."
     },
     "webhooks": {
       "webhooks": "Webhooks",

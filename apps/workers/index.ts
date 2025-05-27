@@ -1,5 +1,10 @@
 import "dotenv/config";
 
+import {
+  ReadwiseRefreshingWorker,
+  ReadwiseWorker,
+} from "workers/readwiseWorker";
+
 import serverConfig from "@karakeep/shared/config";
 import logger from "@karakeep/shared/logger";
 import { runQueueDBMigrations } from "@karakeep/shared/queues";
@@ -26,6 +31,7 @@ async function main() {
     tidyAssets,
     video,
     feed,
+    readwise,
     assetPreprocessing,
     webhook,
     ruleEngine,
@@ -36,11 +42,13 @@ async function main() {
     TidyAssetsWorker.build(),
     VideoWorker.build(),
     FeedWorker.build(),
+    ReadwiseWorker.build(),
     AssetPreprocessingWorker.build(),
     WebhookWorker.build(),
     RuleEngineWorker.build(),
   ];
   FeedRefreshingWorker.start();
+  ReadwiseRefreshingWorker.start();
 
   await Promise.any([
     Promise.all([
@@ -50,6 +58,7 @@ async function main() {
       tidyAssets.run(),
       video.run(),
       feed.run(),
+      readwise.run(),
       assetPreprocessing.run(),
       webhook.run(),
       ruleEngine.run(),
@@ -67,6 +76,7 @@ async function main() {
   tidyAssets.stop();
   video.stop();
   feed.stop();
+  readwise.stop();
   assetPreprocessing.stop();
   webhook.stop();
   ruleEngine.stop();
