@@ -8,9 +8,6 @@ import { zRuleEngineEventSchema } from "./types/rules";
 
 const { dataDir } = serverConfig;
 
-// Check if we're in a worker context
-const isWorkerContext = process.argv.some((arg) => arg.includes("workers"));
-
 // Initialize the queue database
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -19,7 +16,7 @@ if (!fs.existsSync(dataDir)) {
 const QUEUE_DB_PATH = path.join(dataDir, "queue.db");
 
 // Promise-based queue database initialization
-const queueDB = isWorkerContext ? buildDBClient(QUEUE_DB_PATH) : (null as any);
+const queueDB = buildDBClient(QUEUE_DB_PATH);
 
 export function runQueueDBMigrations() {
   migrateDB(queueDB);
