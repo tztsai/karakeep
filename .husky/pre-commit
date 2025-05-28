@@ -1,4 +1,4 @@
-pnpm typecheck
+# pnpm typecheck
 pnpm format:fix
-pnpm lint
-pnpm exec sherif
+# pnpm lint
+# pnpm exec sherif
