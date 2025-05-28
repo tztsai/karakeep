@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Slider } from "react-native-awesome-slider";
 import { useSharedValue } from "react-native-reanimated";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { Button } from "@/components/ui/Button";
 import CustomSafeAreaView from "@/components/ui/CustomSafeAreaView";
 import { Divider } from "@/components/ui/Divider";
@@ -10,9 +10,17 @@ import PageTitle from "@/components/ui/PageTitle";
 import { useSession } from "@/lib/session";
 import useAppSettings from "@/lib/settings";
 import { api } from "@/lib/trpc";
-import { ChevronRight } from "lucide-react-native";
+import { ArrowLeft, ChevronRight, List } from "lucide-react-native";
 
-export default function Dashboard() {
+function HeaderLeft() {
+  return (
+    <Pressable className="my-auto px-4" onPress={() => router.back()}>
+      <ArrowLeft color="rgb(0, 122, 255)" size={20} />
+    </Pressable>
+  );
+}
+
+export default function Settings() {
   const { logout } = useSession();
   const {
     settings,
@@ -36,7 +44,12 @@ export default function Dashboard() {
 
   return (
     <CustomSafeAreaView>
-      <PageTitle title="Settings" />
+      <View className="mb-4 flex flex-row items-center justify-between px-4 py-2">
+        <HeaderLeft />
+        <PageTitle title="Settings" className="flex-1 text-center" />
+        <View className="w-12" />
+      </View>
+
       <View className="flex h-full w-full items-center gap-3 px-4 py-2">
         <View className="flex w-full gap-3 rounded-lg bg-white px-4 py-2 dark:bg-accent">
           <Text className="text-lg text-accent-foreground">
@@ -47,6 +60,20 @@ export default function Dashboard() {
             {isLoading ? "Loading ..." : data?.email}
           </Text>
         </View>
+
+        {/* Lists Access */}
+        <View className="flex w-full flex-row items-center justify-between gap-8 rounded-lg bg-white px-4 py-2 dark:bg-accent">
+          <Link asChild href="/dashboard/lists" className="flex-1">
+            <Pressable className="flex flex-row justify-between">
+              <View className="flex flex-row items-center gap-3">
+                <List size={20} color="rgb(0, 122, 255)" />
+                <Text className="text-lg text-accent-foreground">Lists</Text>
+              </View>
+              <ChevronRight color="rgb(0, 122, 255)" />
+            </Pressable>
+          </Link>
+        </View>
+
         <Text className="w-full p-1 text-2xl font-bold text-foreground">
           App Settings
         </Text>

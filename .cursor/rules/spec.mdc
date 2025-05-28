@@ -258,4 +258,4 @@ Karakeep uses a **Turborepo** monorepo with `pnpm` workspaces. Key directories:
 
 ## 💡 Pro Tips
 
-- Check `ui-redesign.md` in `apps/mobile/` for the latest mobile UX plans.
+- Check `ui-redesign.md` in `notes/` for the latest mobile UX plans.

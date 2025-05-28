@@ -9,10 +9,18 @@ import FullPageSpinner from "@/components/ui/FullPageSpinner";
 import PageTitle from "@/components/ui/PageTitle";
 import { api } from "@/lib/trpc";
 import { condProps } from "@/lib/utils";
-import { ChevronRight, Plus } from "lucide-react-native";
+import { ArrowLeft, ChevronRight, Plus } from "lucide-react-native";
 
 import { useBookmarkLists } from "@karakeep/shared-react/hooks/lists";
 import { ZBookmarkListTreeNode } from "@karakeep/shared/utils/listUtils";
+
+function HeaderLeft() {
+  return (
+    <Pressable className="my-auto px-4" onPress={() => router.back()}>
+      <ArrowLeft color="rgb(0, 122, 255)" size={20} />
+    </Pressable>
+  );
+}
 
 function HeaderRight({ openNewListModal }: { openNewListModal: () => void }) {
   return (
@@ -118,8 +126,9 @@ export default function Lists() {
       <FlatList
         className="h-full"
         ListHeaderComponent={
-          <View className="flex flex-row justify-between">
-            <PageTitle title="Lists" />
+          <View className="mb-4 flex flex-row items-center justify-between px-4 py-2">
+            <HeaderLeft />
+            <PageTitle title="Lists" className="flex-1 text-center" />
             <HeaderRight
               openNewListModal={() => router.push("/dashboard/lists/new")}
             />
@@ -127,10 +136,11 @@ export default function Lists() {
         }
         contentContainerStyle={{
           gap: 5,
+          paddingHorizontal: 16,
         }}
         renderItem={(l) => (
           <View
-            className="mx-2 flex flex-row items-center rounded-xl border border-input bg-white px-4 py-2 dark:bg-accent"
+            className="flex flex-row items-center rounded-xl border border-input bg-white px-4 py-2 dark:bg-accent"
             style={condProps({
               condition: l.item.level > 0,
               props: { marginLeft: l.item.level * 20 },

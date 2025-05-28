@@ -1,7 +1,7 @@
 import React, { useLayoutEffect } from "react";
 import { Tabs, useNavigation } from "expo-router";
 import { StyledTabs } from "@/components/navigation/tabs";
-import { ClipboardList, Home, Settings } from "lucide-react-native";
+import { Eye, MessageCircle, PenTool } from "lucide-react-native";
 
 export default function TabLayout() {
   const navigation = useNavigation();
@@ -21,24 +21,24 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="chew"
         options={{
-          title: "Home",
-          tabBarIcon: ({ color }) => <Home color={color} />,
+          title: "Chew",
+          tabBarIcon: ({ color }) => <Eye color={color} />,
         }}
       />
       <Tabs.Screen
-        name="lists"
+        name="chat"
         options={{
-          title: "Lists",
-          tabBarIcon: ({ color }) => <ClipboardList color={color} />,
+          title: "Chat",
+          tabBarIcon: ({ color }) => <MessageCircle color={color} />,
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="cast"
         options={{
-          title: "Settings",
-          tabBarIcon: ({ color }) => <Settings color={color} />,
+          title: "Cast",
+          tabBarIcon: ({ color }) => <PenTool color={color} />,
         }}
       />
     </StyledTabs>

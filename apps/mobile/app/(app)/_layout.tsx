@@ -1,7 +1,7 @@
 import { Stack } from "expo-router/stack";
 import { StyledStack } from "@/components/navigation/stack";
-import { useColorScheme } from "nativewind";
 import { cn } from "@/lib/utils";
+import { useColorScheme } from "nativewind";
 
 export default function AppLayout() {
   const { colorScheme } = useColorScheme();
