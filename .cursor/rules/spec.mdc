@@ -1,6 +1,261 @@
 ---
 description: 
-globs: 
+globs: *.tsx,*.ts,*.js,*.md,*.sh
 alwaysApply: false
 ---
-- 
+## 🚀 What is Karakeep?
+
+**Karakeep** (previously Hoarder) is a self-hostable, full-featured bookmark and note-taking app with AI-powered features, designed for “data hoarders.” It supports links, notes, images, PDFs, and more, with automatic metadata fetching, full-text search, AI tagging, OCR, and multi-platform support (web, mobile, browser extension, REST API).
+
+---
+
+## 🏗️ Monorepo Structure
+
+Karakeep uses a **Turborepo** monorepo with `pnpm` workspaces. Key directories:
+
+├── apps/                # All deployable applications (web, mobile, CLI, etc.)
+│   ├── web/             # Next.js web app
+│   │   ├── app/         # App router pages and layouts
+│   │   ├── components/  # React UI components
+│   │   ├── lib/         # Utilities, hooks, helpers
+│   │   ├── public/      # Static assets
+│   │   ├── server/      # Server-side logic (API handlers, etc.)
+│   │   ├── @types/      # TypeScript types
+│   │   ├── ...          # Configs: next.config.mjs, tailwind.config.ts, etc.
+│   │
+│   ├── mobile/          # React Native (Expo) mobile app
+│   │   ├── app/         # App entry and navigation
+│   │   ├── components/  # UI components
+│   │   ├── lib/         # Utilities, hooks
+│   │   ├── plugins/     # Native plugins/integrations
+│   │   ├── assets/      # Images, fonts, sounds
+│   │   ├── android/     # Android-specific files
+│   │   ├── ...          # Configs: app.json, tailwind.config.ts, etc.
+│   │
+│   ├── browser-extension/ # Chrome/Firefox extension
+│   │   ├── src/         # Source code
+│   │   ├── public/      # Static assets
+│   │   ├── dist/        # Build output
+│   │   ├── ...          # Configs: manifest.json, tailwind.config.js, etc.
+│   │
+│   ├── cli/             # Command-line interface
+│   │   ├── src/         # CLI source code
+│   │   ├── dist/        # Build output
+│   │   └── ...          # Configs
+│   │
+│   ├── workers/         # Background workers (jobs, queues)
+│   │   ├── workers/     # Worker scripts
+│   │   ├── ...          # Utilities, configs
+│   │
+│   └── mcp/             # (Likely admin/control panel)
+│       ├── src/         # Source code
+│       ├── dist/        # Build output
+│       └── ...          # Configs
+│
+├── packages/            # Shared libraries, backend, and core logic
+│   ├── api/             # Hono-based REST API
+│   │   ├── routes/      # API route handlers (tags, lists, users, etc.)
+│   │   ├── middlewares/ # API middlewares (auth, etc.)
+│   │   ├── utils/       # API utilities (pagination, types)
+│   │   └── index.ts     # API entry point
+│   │
+│   ├── db/              # Drizzle ORM database schema and access
+│   │   ├── schema.ts    # Main DB schema (users, bookmarks, tags, etc.)
+│   │   ├── drizzle/     # Drizzle migrations/config
+│   │   ├── ...          # DB utilities, config, migration scripts
+│   │
+│   ├── trpc/            # tRPC routers for type-safe API
+│   │   ├── routers/     # Routers for bookmarks, users, tags, etc.
+│   │   ├── models/      # Data models
+│   │   ├── lib/         # Helpers/utilities
+│   │   └── index.ts     # tRPC entry point
+│   │
+│   ├── shared/          # Shared code (types, utils, config)
+│   │   ├── types/       # TypeScript types (bookmarks, tags, etc.)
+│   │   ├── utils/       # Utility functions
+│   │   └── ...          # Config, logger, prompts, search, etc.
+│   │
+│   ├── shared-react/    # Shared React components, hooks, providers
+│   │   ├── hooks/       # React hooks
+│   │   ├── providers/   # React context providers
+│   │   ├── utils/       # React utilities
+│   │
+│   ├── sdk/             # SDK for external integrations or clients
+│   │
+│   ├── open-api/        # OpenAPI spec and related code
+│   │
+│   └── e2e_tests/       # End-to-end tests
+│
+├── docs/                # Project documentation
+├── notes/               # Project notes, ideas, and planning
+├── docker/              # Docker-related files
+├── kubernetes/          # Kubernetes deployment files
+├── screenshots/         # App screenshots and logos
+├── tooling/             # Dev tooling/scripts
+└── ...                  # Other configs (.gitignore, .prettierrc, pnpm-workspace.yaml, turbo.json, etc.)
+
+## 📱 **Applications (apps/)**
+
+### **1. Web App (`apps/web/`)**
+- **Framework**: Next.js 14 with App Router
+- **State Management**: Zustand
+- **Forms**: React Hook Form + Zod validation
+- **Rich Text**: Lexical editor
+- **PWA**: Next-PWA for offline capabilities
+- **Internationalization**: i18next
+
+### **2. Mobile App (`apps/mobile/`)**
+- **Framework**: Expo (React Native)
+- **Styling**: NativeWind (Tailwind for React Native)
+- **Navigation**: Expo Router
+- **UI Components**: Custom components with Lucide icons
+
+### **3. Other Apps**
+- **CLI** - Command-line interface
+- **Browser Extension** - Chrome/Firefox extension
+- **Workers** - Background job processing
+- **Landing Page** - Marketing site
+- **MCP** - Model Context Protocol integration
+
+## 📦 **Shared Packages (`packages/`)**
+
+### **Database (`packages/db/`)**
+- **ORM**: Drizzle ORM
+- **Database**: SQLite (Better-SQLite3)
+- **Migrations**: Drizzle Kit
+- **Schema**: Type-safe database schemas
+
+### **API Layer (`packages/trpc/`)**
+- **tRPC** - End-to-end typesafe APIs
+- **Authentication**: bcryptjs for password hashing
+- **Validation**: Zod schemas
+- **Serialization**: SuperJSON
+
+### **Shared Libraries**
+- **`shared`** - Common utilities and types
+- **`shared-react`** - React-specific shared components
+- **`api`** - API definitions
+- **`sdk`** - Client SDK
+- **`open-api`** - OpenAPI specifications
+
+## 🛠️ **Development Tools**
+
+### **Code Quality**
+- **TypeScript** - Type safety across the stack
+- **ESLint** - Linting with custom configs
+- **Prettier** - Code formatting
+- **Vitest** - Testing framework
+
+### **Build & Deploy**
+- **Docker** - Containerization
+- **Kubernetes** - Orchestration configs
+- **GitHub Actions** - CI/CD pipeline
+
+## 🔧 **Key Technologies**
+
+### **Frontend Stack**
+- **React 18** with modern hooks
+- **Next.js 14** with App Router
+- **Tailwind CSS** for styling
+- **Radix UI** for accessible components
+- **TanStack Query** for server state management
+
+### **Backend Stack**
+- **tRPC** for type-safe API calls
+- **Drizzle ORM** with SQLite
+- **NextAuth.js** for authentication
+- **Puppeteer** for web scraping
+- **Meilisearch** for full-text search
+
+### **AI & Processing**
+- **OpenAI** integration for auto-tagging and summarization
+- **Ollama** support for local models
+- **OCR** for text extraction from images
+- **Monolith** for full-page archival
+
+---
+
+## 🗄️ Database (Drizzle ORM, SQLite)
+
+### **Core Entities**
+
+- **users**: User accounts (id, name, email, password, role, etc.)
+- **accounts, sessions, verificationTokens**: For authentication (NextAuth-compatible)
+- **apiKeys**: For user-specific API access
+
+### **Bookmarks & Content**
+
+- **bookmarks**: The main entity (id, userId, title, type, archived, favourited, note, summary, etc.)
+- **bookmarkLinks**: Link-specific metadata (url, title, description, author, publisher, image, favicon, HTML content, crawl status, etc.)
+- **bookmarkTexts**: For text notes (text, sourceUrl)
+- **bookmarkAssets**: For files (images, PDFs, etc.) attached to bookmarks
+
+### **Organization & Metadata**
+
+- **bookmarkTags**: User-defined tags (name, userId, createdAt)
+- **tagsOnBookmarks**: Many-to-many between bookmarks and tags (attachedBy: `ai` or `human`)
+- **bookmarkLists**: Lists/folders for organizing bookmarks (manual or smart, with query support, parentId for nesting)
+- **bookmarksInLists**: Many-to-many between bookmarks and lists
+
+### **Assets & Highlights**
+
+- **assets**: All uploaded files (id, assetType, size, contentType, fileName, bookmarkId, userId)
+- **highlights**: User highlights on bookmarks (startOffset, endOffset, color, text, note)
+
+### **Other Tables**
+
+- **customPrompts**: User-defined AI prompts for tagging/summarization
+- **rssFeedsTable**: RSS feed integrations (name, url, enabled, lastFetchedAt, etc.)
+
+### **Migrations**
+
+- Located in `packages/db/drizzle/` as SQL files, managed by Drizzle.
+
+---
+
+## 🛠️ Backend Architecture
+
+### **API Layers**
+
+#### 1. **REST API (Hono)**
+- Located in `packages/api/routes/`
+- Each file (e.g., `bookmarks.ts`, `tags.ts`, `lists.ts`, `users.ts`, `assets.ts`, `highlights.ts`) defines endpoints for CRUD and advanced operations.
+- Uses Zod for validation, and custom middlewares for authentication.
+
+#### 2. **tRPC API**
+- Located in `packages/trpc/routers/`
+- Type-safe, auto-typed API for frontend and other clients
+- Routers for all major entities: `bookmarks`, `tags`, `lists`, `users`, `assets`, `highlights`, `feeds`, `prompts`, `admin`, etc.
+- Each router exposes queries and mutations, e.g.:
+  - `createBookmark`, `getBookmarks`, `updateBookmark`, `deleteBookmark`
+  - `addTag`, `removeTag`, `searchBookmarks`, etc.
+- Handles business logic, validation, and DB access
+
+#### 3. **Shared Logic**
+- `packages/shared/` contains types, utility functions, config, search logic, AI integration, etc.
+- `packages/shared-react/` contains React-specific hooks and providers for consuming tRPC and shared logic.
+
+### **Workers & Background Jobs**
+
+- `apps/workers/` runs background jobs for:
+  - Crawling links (Puppeteer)
+  - AI tagging (OpenAI/local models)
+  - OCR (Tesseract)
+  - Search indexing (Meilisearch)
+  - Rule engine, webhooks, etc.
+
+---
+
+## 🏆 Best Practices
+
+- Use consistent code style (Prettier, ESLint)
+- Modular, reusable components
+- Robust error handling
+- Accessibility and responsive design
+- Write meaningful comments and documentation
+
+---
+
+## 💡 Pro Tips
+
+- Check `ui-redesign.md` in `apps/mobile/` for the latest mobile UX plans.
