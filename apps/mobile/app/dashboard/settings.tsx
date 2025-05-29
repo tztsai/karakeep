@@ -44,7 +44,7 @@ export default function Settings() {
 
   return (
     <CustomSafeAreaView>
-      <View className="mb-4 flex flex-row items-center justify-between px-4 py-2">
+      <View className="mb-4 flex flex-row items-center justify-between px-5 py-2">
         <HeaderLeft />
         <PageTitle title="Settings" className="flex-1 text-center" />
         <View className="w-12" />

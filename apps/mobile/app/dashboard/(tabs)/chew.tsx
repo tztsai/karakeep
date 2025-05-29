@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import UpdatingBookmarkList from "@/components/bookmarks/UpdatingBookmarkList";
 import AddItemModal from "@/components/chew/AddItemModal";
@@ -9,9 +8,6 @@ import { TailwindResolver } from "@/components/TailwindResolver";
 import CustomSafeAreaView from "@/components/ui/CustomSafeAreaView";
 import PageTitle from "@/components/ui/PageTitle";
 import { useToast } from "@/components/ui/Toast";
-import useAppSettings from "@/lib/settings";
-import { useUploadAsset } from "@/lib/upload";
-import { MenuView } from "@react-native-menu/menu";
 import {
   Filter,
   Grid,
@@ -20,7 +16,7 @@ import {
   Search,
   Settings,
 } from "lucide-react-native";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
 
 type ViewMode = "list" | "card";
 
@@ -39,69 +35,16 @@ function HeaderLeft() {
 }
 
 function HeaderRight({ onQuickAdd }: { onQuickAdd: () => void }) {
-  const { toast } = useToast();
-  const { settings } = useAppSettings();
-  const { uploadAsset } = useUploadAsset(settings, {
-    onError: (e) => {
-      toast({ message: e, variant: "destructive" });
-    },
-  });
-
   return (
-    <MenuView
-      onPressAction={async ({ nativeEvent }) => {
+    <Pressable
+      className="my-auto px-4"
+      onPress={() => {
         Haptics.selectionAsync();
-        if (nativeEvent.event === "new") {
-          router.push("/dashboard/bookmarks/new");
-        } else if (nativeEvent.event === "quick") {
-          onQuickAdd();
-        } else if (nativeEvent.event === "library") {
-          const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            quality: settings.imageQuality,
-            allowsMultipleSelection: false,
-          });
-          if (!result.canceled) {
-            uploadAsset({
-              type: result.assets[0].mimeType ?? "",
-              name: result.assets[0].fileName ?? "",
-              uri: result.assets[0].uri,
-            });
-          }
-        }
+        onQuickAdd();
       }}
-      actions={[
-        {
-          id: "quick",
-          title: "Quick Add",
-          image: Platform.select({
-            ios: "plus.circle",
-          }),
-        },
-        {
-          id: "new",
-          title: "New Bookmark",
-          image: Platform.select({
-            ios: "note.text",
-          }),
-        },
-        {
-          id: "library",
-          title: "Photo Library",
-          image: Platform.select({
-            ios: "photo",
-          }),
-        },
-      ]}
-      shouldOpenOnLongPress={false}
     >
-      <View className="my-auto px-4">
-        <Plus
-          color="rgb(0, 122, 255)"
-          onPress={() => Haptics.selectionAsync()}
-        />
-      </View>
-    </MenuView>
+      <Plus color="rgb(0, 122, 255)" size={20} />
+    </Pressable>
   );
 }
 
@@ -185,10 +128,13 @@ export default function Chew() {
       <UpdatingBookmarkList
         query={{ archived: false }}
         header={
-          <View className="flex flex-col gap-3">
+          <View className="mt-5 flex flex-col gap-3">
             <View className="flex flex-row items-center justify-between">
               <HeaderLeft />
-              <PageTitle title={t('chew')} className="flex-1 text-center" />
+              <ViewModeToggle
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+              />
               <HeaderRight onQuickAdd={() => setShowAddModal(true)} />
             </View>
 
@@ -216,11 +162,6 @@ export default function Chew() {
                 <Filter size={16} color="rgb(0, 122, 255)" />
               </Pressable>
             </View>
-
-            <ViewModeToggle
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-            />
           </View>
         }
       />

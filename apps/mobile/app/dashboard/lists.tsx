@@ -31,7 +31,7 @@ function HeaderRight({ openNewListModal }: { openNewListModal: () => void }) {
         openNewListModal();
       }}
     >
-      <Plus color="rgb(0, 122, 255)" />
+      <Plus color="rgb(0, 122, 255)" size={20} />
     </Pressable>
   );
 }
@@ -126,7 +126,7 @@ export default function Lists() {
       <FlatList
         className="h-full"
         ListHeaderComponent={
-          <View className="mb-4 flex flex-row items-center justify-between px-4 py-2">
+          <View className="mb-4 flex flex-row items-center justify-between px-0 py-2">
             <HeaderLeft />
             <PageTitle title="Lists" className="flex-1 text-center" />
             <HeaderRight

@@ -24,7 +24,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react-native";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
 
 interface ReferenceItem {
   id: string;
@@ -213,7 +213,7 @@ This is a placeholder for AI-composed content. The actual implementation will us
         <View className="flex-1">
           {/* Header */}
           <View className="flex flex-row items-center justify-between px-4 py-2">
-            <PageTitle title={t('cast')} className="pb-4" />
+            <PageTitle title={t("cast")} className="pb-4" />
             <View className="flex flex-row items-center gap-2">
               <Pressable
                 className={`rounded-lg p-2 ${

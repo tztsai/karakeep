@@ -9,11 +9,19 @@ import {
   View,
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import { TailwindResolver } from "@/components/TailwindResolver";
 import CustomSafeAreaView from "@/components/ui/CustomSafeAreaView";
 import PageTitle from "@/components/ui/PageTitle";
-import { BookOpen, Clock, Send, Sparkles } from "lucide-react-native";
-import { useTranslation } from 'react-i18next';
+import {
+  BookOpen,
+  Clock,
+  Hash,
+  Send,
+  Sparkles,
+  Star,
+  TrendingUp,
+  Zap,
+} from "lucide-react-native";
+import { useTranslation } from "react-i18next";
 
 interface ChatMessage {
   id: string;
@@ -271,7 +279,7 @@ export default function Chat() {
         className="flex-1"
       >
         <View className="flex-1 px-4">
-          <PageTitle title={t('chat')} className="pb-4" />
+          <PageTitle title={t("chat")} className="pb-4" />
 
           {messages.length === 0 ? (
             <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>

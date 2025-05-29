@@ -129,6 +129,22 @@ export default function Dashboard() {
         }}
       />
       <Stack.Screen
+        name="settings"
+        options={{
+          headerTitle: "",
+          headerBackTitle: "",
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="lists"
+        options={{
+          headerTitle: "",
+          headerBackTitle: "",
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="settings/theme"
         options={{
           title: "Theme",
