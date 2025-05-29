@@ -1,10 +1,10 @@
 import { ImageURISource } from "react-native";
 
-import useAppSettings from "./settings";
-import { api } from "./trpc";
-
 import { isBookmarkStillCrawling } from "@karakeep/shared-react/utils/bookmarkUtils";
 import { ZBookmark } from "@karakeep/shared/types/bookmarks";
+
+import useAppSettings from "./settings";
+import { api } from "./trpc";
 
 export function useAssetUrl(assetId: string): ImageURISource {
   const { settings } = useAppSettings();
@@ -37,7 +37,7 @@ export function useBookmarkContent(bookmark: ZBookmark) {
         }
         return false;
       },
-    }
+    },
   );
 
   const hasHtmlContent =
@@ -49,4 +49,4 @@ export function useBookmarkContent(bookmark: ZBookmark) {
     isStillCrawling,
     hasHtmlContent,
   };
-} 
+}

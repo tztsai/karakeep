@@ -70,4 +70,4 @@ export function createHtmlPage(htmlContent: string): string {
       </body>
     </html>
   `;
-} 
+}

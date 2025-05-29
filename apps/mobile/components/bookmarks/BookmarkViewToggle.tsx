@@ -15,7 +15,7 @@ export default function BookmarkViewToggle({
   readerViewDisabled = false,
 }: BookmarkViewToggleProps) {
   return (
-    <View className="flex flex-row bg-background border-b border-input">
+    <View className="flex flex-row border-b border-input bg-background">
       <Pressable
         onPress={() => onViewChange("reader")}
         className={`flex-1 px-4 py-3 ${
@@ -47,4 +47,4 @@ export default function BookmarkViewToggle({
       </Pressable>
     </View>
   );
-} 
+}

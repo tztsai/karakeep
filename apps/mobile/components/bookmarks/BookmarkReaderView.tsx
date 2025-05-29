@@ -30,7 +30,10 @@ export default function BookmarkReaderView({
     );
   }
 
-  if (hasHtmlContent && bookmarkWithContent?.content.type === BookmarkTypes.LINK) {
+  if (
+    hasHtmlContent &&
+    bookmarkWithContent?.content.type === BookmarkTypes.LINK
+  ) {
     return (
       <WebView
         source={{
@@ -47,9 +50,9 @@ export default function BookmarkReaderView({
   return (
     <View className="flex-1 items-center justify-center bg-background">
       <Text className="text-gray-500">No offline content available</Text>
-      <Text className="text-gray-400 mt-2">
+      <Text className="mt-2 text-gray-400">
         Try Web View to see the original page
       </Text>
     </View>
   );
-} 
+}
