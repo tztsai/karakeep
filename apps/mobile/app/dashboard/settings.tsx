@@ -61,19 +61,6 @@ export default function Settings() {
           </Text>
         </View>
 
-        {/* Lists Access */}
-        <View className="flex w-full flex-row items-center justify-between gap-8 rounded-lg bg-white px-4 py-2 dark:bg-accent">
-          <Link asChild href="/dashboard/lists" className="flex-1">
-            <Pressable className="flex flex-row justify-between">
-              <View className="flex flex-row items-center gap-3">
-                <List size={20} color="rgb(0, 122, 255)" />
-                <Text className="text-lg text-accent-foreground">Lists</Text>
-              </View>
-              <ChevronRight color="rgb(0, 122, 255)" />
-            </Pressable>
-          </Link>
-        </View>
-
         <Text className="w-full p-1 text-2xl font-bold text-foreground">
           App Settings
         </Text>
@@ -85,7 +72,7 @@ export default function Settings() {
                 <Text className="text-lg text-muted-foreground">
                   {
                     { light: "Light", dark: "Dark", system: "System" }[
-                      settings.theme
+                    settings.theme
                     ]
                   }
                 </Text>
@@ -94,6 +81,18 @@ export default function Settings() {
             </Pressable>
           </Link>
         </View>
+
+        <View className="flex w-full flex-row items-center justify-between gap-8 rounded-lg bg-white px-4 py-2 dark:bg-accent">
+          <Link asChild href="/dashboard/lists" className="flex-1">
+            <Pressable className="flex flex-row justify-between">
+              <View className="flex flex-row items-center gap-3">
+                <Text className="text-lg text-accent-foreground">Lists</Text>
+              </View>
+              <List size={20} color="rgb(0, 122, 255)" />
+            </Pressable>
+          </Link>
+        </View>
+
         <Text className="w-full p-1 text-2xl font-bold text-foreground">
           Upload Settings
         </Text>
