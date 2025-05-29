@@ -10,7 +10,7 @@ import PageTitle from "@/components/ui/PageTitle";
 import { useSession } from "@/lib/session";
 import useAppSettings from "@/lib/settings";
 import { api } from "@/lib/trpc";
-import { ArrowLeft, ChevronRight, List } from "lucide-react-native";
+import { ArrowLeft, ChevronRight, Hash, List } from "lucide-react-native";
 
 function HeaderLeft() {
   return (
@@ -72,7 +72,7 @@ export default function Settings() {
                 <Text className="text-lg text-muted-foreground">
                   {
                     { light: "Light", dark: "Dark", system: "System" }[
-                    settings.theme
+                      settings.theme
                     ]
                   }
                 </Text>
@@ -89,6 +89,17 @@ export default function Settings() {
                 <Text className="text-lg text-accent-foreground">Lists</Text>
               </View>
               <List size={20} color="rgb(0, 122, 255)" />
+            </Pressable>
+          </Link>
+        </View>
+
+        <View className="flex w-full flex-row items-center justify-between gap-8 rounded-lg bg-white px-4 py-2 dark:bg-accent">
+          <Link asChild href="/dashboard/tags" className="flex-1">
+            <Pressable className="flex flex-row justify-between">
+              <View className="flex flex-row items-center gap-3">
+                <Text className="text-lg text-accent-foreground">Tags</Text>
+              </View>
+              <Hash size={20} color="rgb(0, 122, 255)" />
             </Pressable>
           </Link>
         </View>

@@ -9,11 +9,11 @@ import { Stack } from "expo-router/stack";
 import { ShareIntentProvider, useShareIntent } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { StyledStack } from "@/components/navigation/stack";
+import FullPageSpinner from "@/components/ui/FullPageSpinner";
 import { Providers } from "@/lib/providers";
 import useAppSettings from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useColorScheme } from "nativewind";
-import FullPageSpinner from "@/components/ui/FullPageSpinner";
 
 function NavigationReadyStack() {
   const router = useRouter();
