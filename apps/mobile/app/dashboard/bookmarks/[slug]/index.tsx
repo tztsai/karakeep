@@ -281,6 +281,16 @@ function BookmarkAssetView({ bookmark }: { bookmark: ZBookmark }) {
           className="h-56 min-h-56 w-full object-cover"
         />
       </Pressable>
+
+      {bookmark.content.content && (
+        <ScrollView className="flex-1 px-4">
+          <View className="mb-4 rounded-xl border border-accent bg-card p-4">
+            <Text className="text-base text-foreground">
+              {bookmark.content.content}
+            </Text>
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 }

@@ -204,7 +204,7 @@ async function extractAndSaveImageText(
       content: imageText,
       metadata: null,
     })
-    .where(eq(bookmarkAssets.id, bookmark.id));
+    .where(eq(bookmarkAssets.id, bookmark.asset.id));
   return true;
 }
 
@@ -241,7 +241,7 @@ async function extractAndSavePDFText(
       content: pdfParse.text,
       metadata: pdfParse.metadata ? JSON.stringify(pdfParse.metadata) : null,
     })
-    .where(eq(bookmarkAssets.id, bookmark.id));
+    .where(eq(bookmarkAssets.id, bookmark.asset.id));
   return true;
 }
 
