@@ -20,6 +20,7 @@ import {
   Search,
   Settings,
 } from "lucide-react-native";
+import { useTranslation } from 'react-i18next';
 
 type ViewMode = "list" | "card";
 
@@ -163,6 +164,7 @@ export default function Chew() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [showAddModal, setShowAddModal] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const handleAddItem = (item: {
     type: "text" | "url" | "image";
@@ -186,7 +188,7 @@ export default function Chew() {
           <View className="flex flex-col gap-3">
             <View className="flex flex-row items-center justify-between">
               <HeaderLeft />
-              <PageTitle title="Chew" className="flex-1 text-center" />
+              <PageTitle title={t('chew')} className="flex-1 text-center" />
               <HeaderRight onQuickAdd={() => setShowAddModal(true)} />
             </View>
 

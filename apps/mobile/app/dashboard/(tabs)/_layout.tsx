@@ -2,9 +2,11 @@ import React, { useLayoutEffect } from "react";
 import { Tabs, useNavigation } from "expo-router";
 import { StyledTabs } from "@/components/navigation/tabs";
 import { Eye, MessageCircle, PenTool } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
 
 export default function TabLayout() {
   const navigation = useNavigation();
+  const { t } = useTranslation();
   // Hide the header on the parent screen
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -23,21 +25,21 @@ export default function TabLayout() {
       <Tabs.Screen
         name="chew"
         options={{
-          title: "Chew",
+          title: t("chew"),
           tabBarIcon: ({ color }) => <Eye color={color} />,
         }}
       />
       <Tabs.Screen
         name="chat"
         options={{
-          title: "Chat",
+          title: t("chat"),
           tabBarIcon: ({ color }) => <MessageCircle color={color} />,
         }}
       />
       <Tabs.Screen
         name="cast"
         options={{
-          title: "Cast",
+          title: t("cast"),
           tabBarIcon: ({ color }) => <PenTool color={color} />,
         }}
       />

@@ -13,6 +13,7 @@ import { TailwindResolver } from "@/components/TailwindResolver";
 import CustomSafeAreaView from "@/components/ui/CustomSafeAreaView";
 import PageTitle from "@/components/ui/PageTitle";
 import { BookOpen, Clock, Send, Sparkles } from "lucide-react-native";
+import { useTranslation } from 'react-i18next';
 
 interface ChatMessage {
   id: string;
@@ -197,6 +198,7 @@ function ChatMessage({
 }
 
 export default function Chat() {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -269,7 +271,7 @@ export default function Chat() {
         className="flex-1"
       >
         <View className="flex-1 px-4">
-          <PageTitle title="Chat" className="pb-4" />
+          <PageTitle title={t('chat')} className="pb-4" />
 
           {messages.length === 0 ? (
             <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>

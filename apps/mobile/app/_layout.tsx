@@ -1,5 +1,6 @@
 import "@/globals.css";
 import "expo-dev-client";
+import "@/lib/i18n";
 
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
