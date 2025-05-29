@@ -1,13 +1,11 @@
 import { useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import UpdatingBookmarkList from "@/components/bookmarks/UpdatingBookmarkList";
 import AddItemModal from "@/components/chew/AddItemModal";
 import { TailwindResolver } from "@/components/TailwindResolver";
 import CustomSafeAreaView from "@/components/ui/CustomSafeAreaView";
-import PageTitle from "@/components/ui/PageTitle";
-import { useToast } from "@/components/ui/Toast";
 import {
   Filter,
   Grid,
@@ -16,7 +14,6 @@ import {
   Search,
   Settings,
 } from "lucide-react-native";
-import { useTranslation } from "react-i18next";
 
 type ViewMode = "list" | "card";
 
@@ -106,22 +103,6 @@ function ViewModeToggle({
 export default function Chew() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [showAddModal, setShowAddModal] = useState(false);
-  const { toast } = useToast();
-  const { t } = useTranslation();
-
-  const handleAddItem = (item: {
-    type: "text" | "url" | "image";
-    content: string;
-    uri?: string;
-    fileName?: string;
-  }) => {
-    // TODO: Implement actual item creation via API
-    console.log("Adding item:", item);
-    toast({
-      message: `${item.type.charAt(0).toUpperCase() + item.type.slice(1)} added successfully!`,
-      variant: "default",
-    });
-  };
 
   return (
     <CustomSafeAreaView>
@@ -180,7 +161,6 @@ export default function Chew() {
       <AddItemModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onAddItem={handleAddItem}
       />
     </CustomSafeAreaView>
   );
