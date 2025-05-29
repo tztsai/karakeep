@@ -6,12 +6,15 @@ import {
   Pressable,
   ScrollView,
   View,
+  Text,
 } from "react-native";
 import ImageView from "react-native-image-viewing";
 import WebView from "react-native-webview";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import BookmarkAssetImage from "@/components/bookmarks/BookmarkAssetImage";
 import BookmarkTextMarkdown from "@/components/bookmarks/BookmarkTextMarkdown";
+import BookmarkReaderView from "@/components/bookmarks/BookmarkReaderView";
+import BookmarkViewToggle, { ViewMode } from "@/components/bookmarks/BookmarkViewToggle";
 import FullPageError from "@/components/FullPageError";
 import { TailwindResolver } from "@/components/TailwindResolver";
 import { Button } from "@/components/ui/Button";
@@ -21,12 +24,14 @@ import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
 import { useAssetUrl } from "@/lib/hooks";
 import { api } from "@/lib/trpc";
+import { useBookmarkContent } from "@/lib/hooks";
 import { ClipboardList, Globe, Info, Tag, Trash2 } from "lucide-react-native";
 
 import {
   useDeleteBookmark,
   useUpdateBookmark,
 } from "@karakeep/shared-react/hooks/bookmarks";
+import { isBookmarkStillCrawling } from "@karakeep/shared-react/utils/bookmarkUtils";
 import { BookmarkTypes, ZBookmark } from "@karakeep/shared/types/bookmarks";
 
 function BottomActions({ bookmark }: { bookmark: ZBookmark }) {
@@ -155,12 +160,35 @@ function BookmarkLinkView({ bookmark }: { bookmark: ZBookmark }) {
   if (bookmark.content.type !== BookmarkTypes.LINK) {
     throw new Error("Wrong content type rendered");
   }
+
+  const [currentView, setCurrentView] = useState<ViewMode>("reader");
+  const { bookmarkWithContent, isStillCrawling, hasHtmlContent } = useBookmarkContent(bookmark);
+
+  const readerViewDisabled = !hasHtmlContent && !isStillCrawling;
+
   return (
-    <WebView
-      startInLoadingState={true}
-      mediaPlaybackRequiresUserAction={true}
-      source={{ uri: bookmark.content.url }}
-    />
+    <View className="flex-1">
+      <BookmarkViewToggle
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        readerViewDisabled={readerViewDisabled}
+      />
+
+      {currentView === "reader" ? (
+        <BookmarkReaderView
+          bookmark={bookmark}
+          bookmarkWithContent={bookmarkWithContent}
+          isStillCrawling={isStillCrawling}
+        />
+      ) : (
+        <WebView
+          source={{ uri: bookmark.content.url }}
+          style={{ flex: 1 }}
+          startInLoadingState={true}
+          mediaPlaybackRequiresUserAction={true}
+        />
+      )}
+    </View>
   );
 }
 
