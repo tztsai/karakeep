@@ -123,20 +123,10 @@ function ActionBar({ bookmark }: { bookmark: ZBookmark }) {
         }}
         actions={[
           {
-            id: "archive",
-            title: bookmark.archived ? "Un-archive" : "Archive",
+            id: "manage_tags",
+            title: "Manage Tags",
             image: Platform.select({
-              ios: "folder",
-            }),
-          },
-          {
-            id: "delete",
-            title: "Delete",
-            attributes: {
-              destructive: true,
-            },
-            image: Platform.select({
-              ios: "trash",
+              ios: "tag",
             }),
           },
           {
@@ -147,10 +137,13 @@ function ActionBar({ bookmark }: { bookmark: ZBookmark }) {
             }),
           },
           {
-            id: "manage_tags",
-            title: "Manage Tags",
+            id: "delete",
+            title: "Delete",
+            attributes: {
+              destructive: true,
+            },
             image: Platform.select({
-              ios: "tag",
+              ios: "trash",
             }),
           },
         ]}

@@ -5,6 +5,7 @@ import { useLocalSearchParams } from "expo-router";
 import CustomSafeAreaView from "@/components/ui/CustomSafeAreaView";
 import { useToast } from "@/components/ui/Toast";
 
+import { useUpdateBookmark } from "@karakeep/shared-react/hooks/bookmarks";
 import {
   useAddBookmarkToList,
   useBookmarkLists,
@@ -35,6 +36,9 @@ const ListPickerPage = () => {
   );
   const { data } = useBookmarkLists();
 
+  // Get bookmark data for favourites and archive status
+  const { data: bookmark } = api.bookmarks.getBookmark.useQuery({ bookmarkId });
+
   const { mutate: addToList } = useAddBookmarkToList({
     onSuccess: () => {
       toast({
@@ -55,10 +59,39 @@ const ListPickerPage = () => {
     onError,
   });
 
+  const { mutate: updateBookmark } = useUpdateBookmark({
+    onSuccess: () => {
+      toast({
+        message: `The bookmark has been updated successfully!`,
+        showProgress: false,
+      });
+    },
+    onError,
+  });
+
   const toggleList = (listId: string) => {
     if (!existingLists) {
       return;
     }
+
+    // Handle special cases for favourites and archive
+    if (listId === "fav") {
+      updateBookmark({
+        bookmarkId,
+        favourited: !bookmark?.favourited,
+      });
+      return;
+    }
+
+    if (listId === "arch") {
+      updateBookmark({
+        bookmarkId,
+        archived: !bookmark?.archived,
+      });
+      return;
+    }
+
+    // Handle regular lists
     if (existingLists.has(listId)) {
       removeToList({ bookmarkId, listId });
     } else {
@@ -67,6 +100,16 @@ const ListPickerPage = () => {
   };
 
   const { allPaths } = data ?? {};
+
+  // Create special categories that match the main Lists page
+  const specialCategories = [
+    [{ id: "fav", icon: "⭐️", name: "Favourites" }],
+    [{ id: "arch", icon: "🗄️", name: "Archive" }],
+  ];
+
+  // Combine special categories with user-created lists
+  const allListsData = [...specialCategories, ...(allPaths || [])];
+
   return (
     <CustomSafeAreaView>
       <FlatList
@@ -85,10 +128,21 @@ const ListPickerPage = () => {
                 {l.item.map((item) => `${item.icon} ${item.name}`).join(" / ")}
               </Text>
               <Checkbox
-                value={
-                  existingLists &&
-                  existingLists.has(l.item[l.item.length - 1].id)
-                }
+                value={(() => {
+                  const listId = l.item[l.item.length - 1].id;
+
+                  // Handle special cases
+                  if (listId === "fav") {
+                    return bookmark?.favourited ?? false;
+                  }
+
+                  if (listId === "arch") {
+                    return bookmark?.archived ?? false;
+                  }
+
+                  // Handle regular lists
+                  return existingLists && existingLists.has(listId);
+                })()}
                 onValueChange={() => {
                   toggleList(l.item[l.item.length - 1].id);
                 }}
@@ -96,7 +150,7 @@ const ListPickerPage = () => {
             </Pressable>
           </View>
         )}
-        data={allPaths}
+        data={allListsData}
       />
     </CustomSafeAreaView>
   );
