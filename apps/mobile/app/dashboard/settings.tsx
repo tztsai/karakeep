@@ -104,6 +104,28 @@ export default function Settings() {
           </Link>
         </View>
 
+        <View className="flex w-full flex-row items-center justify-between gap-8 rounded-lg bg-white px-4 py-2 dark:bg-accent">
+          <Link
+            asChild
+            href="/dashboard/settings/auto-import"
+            className="flex-1"
+          >
+            <Pressable className="flex flex-row justify-between">
+              <View className="flex flex-row items-center gap-3">
+                <Text className="text-lg text-accent-foreground">
+                  Auto Import
+                </Text>
+              </View>
+              <View className="flex flex-row items-center gap-2">
+                <Text className="text-lg text-muted-foreground">
+                  {settings.autoImport?.enabled ? "On" : "Off"}
+                </Text>
+                <ChevronRight color="rgb(0, 122, 255)" />
+              </View>
+            </Pressable>
+          </Link>
+        </View>
+
         <Text className="w-full p-1 text-2xl font-bold text-foreground">
           Upload Settings
         </Text>

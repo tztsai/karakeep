@@ -27,7 +27,9 @@
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
+        },
+        "NSPhotoLibraryUsageDescription": "The app needs access to your photo library to automatically import images from your selected folder.",
+        "UIBackgroundModes": ["background-processing"]
       },
       "buildNumber": "23"
     },
@@ -48,7 +50,11 @@
         }
       },
       "package": "app.hoarder.hoardermobile",
-      "versionCode": 23
+      "versionCode": 23,
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES"
+      ]
     },
     "plugins": [
       "./plugins/trust-local-certs.js",
@@ -74,6 +80,10 @@
           "photosPermission": "The app access your photo gallary on your request to hoard them."
         }
       ],
+      "expo-media-library",
+      "expo-background-task",
+      "expo-task-manager",
+      "expo-document-picker",
       [
         "expo-build-properties",
         {

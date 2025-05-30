@@ -305,7 +305,10 @@ export default function ListView() {
     data: bookmark,
     error,
     refetch,
-  } = api.bookmarks.getBookmark.useQuery({ bookmarkId: slug });
+  } = api.bookmarks.getBookmark.useQuery({ 
+    bookmarkId: slug,
+    includeContent: true 
+  });
 
   if (error) {
     return <FullPageError error={error.message} onRetry={refetch} />;

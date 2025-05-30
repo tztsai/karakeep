@@ -1,6 +1,10 @@
 import * as SecureStore from "expo-secure-store";
 import { z } from "zod";
 import { create } from "zustand";
+import {
+  configureReanimatedLogger,
+  ReanimatedLogLevel,
+} from 'react-native-reanimated';
 
 const SETTING_NAME = "settings";
 
@@ -10,6 +14,25 @@ const zSettingsSchema = z.object({
   address: z.string(),
   imageQuality: z.number().optional().default(0.2),
   theme: z.enum(["light", "dark", "system"]).optional().default("system"),
+  autoImport: z
+    .object({
+      enabled: z.boolean().default(false),
+      folderUri: z.string().optional(),
+      folderName: z.string().optional(),
+      scanIntervalMinutes: z.number().default(30),
+      lastScanTimestamp: z.number().optional(),
+      bookmarkStatus: z.enum(["success", "error"]).optional(),
+    })
+    .optional()
+    .default({
+      enabled: false,
+      scanIntervalMinutes: 30,
+    }),
+});
+
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false,
 });
 
 export type Settings = z.infer<typeof zSettingsSchema>;
@@ -23,7 +46,15 @@ interface AppSettingsState {
 const useSettings = create<AppSettingsState>((set, get) => ({
   settings: {
     isLoading: true,
-    settings: { address: "", imageQuality: 0.2, theme: "system" },
+    settings: {
+      address: "",
+      imageQuality: 0.2,
+      theme: "system",
+      autoImport: {
+        enabled: false,
+        scanIntervalMinutes: 30,
+      },
+    },
   },
   setSettings: async (settings) => {
     await SecureStore.setItemAsync(SETTING_NAME, JSON.stringify(settings));

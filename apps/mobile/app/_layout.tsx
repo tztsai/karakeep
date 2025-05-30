@@ -3,6 +3,7 @@ import "expo-dev-client";
 import "@/lib/i18n";
 
 import { useEffect, useState } from "react";
+import { AppState } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useRouter } from "expo-router";
 import { Stack } from "expo-router/stack";
@@ -10,6 +11,7 @@ import { ShareIntentProvider, useShareIntent } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { StyledStack } from "@/components/navigation/stack";
 import FullPageSpinner from "@/components/ui/FullPageSpinner";
+import { useAutoImportLifecycle } from "@/lib/autoImport";
 import { Providers } from "@/lib/providers";
 import useAppSettings from "@/lib/settings";
 import { cn } from "@/lib/utils";
@@ -20,7 +22,7 @@ function NavigationReadyStack() {
   const { hasShareIntent } = useShareIntent();
   const { colorScheme, setColorScheme } = useColorScheme();
   const { settings } = useAppSettings();
-
+  
   useEffect(() => {
     if (hasShareIntent) {
       router.replace({
@@ -28,10 +30,13 @@ function NavigationReadyStack() {
       });
     }
   }, [hasShareIntent, router]);
-
+  
   useEffect(() => {
     setColorScheme(settings.theme);
   }, [settings.theme, setColorScheme]);
+
+  // Initialize auto-import lifecycle management
+  useAutoImportLifecycle();
 
   return (
     <StyledStack

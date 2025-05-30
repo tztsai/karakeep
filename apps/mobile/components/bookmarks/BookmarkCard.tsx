@@ -202,14 +202,14 @@ function LinkCard({
         source={
           imageUrl.localAsset
             ? {
-                uri: `${settings.address}${imageUrl.url}`,
-                headers: {
-                  Authorization: `Bearer ${settings.apiKey}`,
-                },
-              }
+              uri: `${settings.address}${imageUrl.url}`,
+              headers: {
+                Authorization: `Bearer ${settings.apiKey}`,
+              },
+            }
             : {
-                uri: imageUrl.url,
-              }
+              uri: imageUrl.url,
+            }
         }
         className="h-56 min-h-56 w-full object-cover"
       />
@@ -308,16 +308,23 @@ function AssetCard({
       </Pressable>
       <View className="flex gap-2 p-2">
         <Pressable onPress={onOpenBookmark}>
-          {title && (
-            <Text className="line-clamp-2 text-xl font-bold text-foreground">
-              {title}
-            </Text>
-          )}
+          <Text className="line-clamp-2 text-xl font-bold text-foreground">
+            {title ?? 
+             (bookmark.content.content ? 
+              bookmark.content.content.substring(20, 100) + (bookmark.content.content.length > 80 ? "..." : "") :
+              "Untitled Asset"
+             )}
+          </Text>
         </Pressable>
         <TagList bookmark={bookmark} />
         <Divider orientation="vertical" className="mt-2 h-0.5 w-full" />
-        <View className="mt-2 flex flex-row justify-between px-2 pb-2">
-          <View />
+        <View className="mt-2 flex flex-row justify-between px-2 pb-2" >
+          <Text className="my-auto line-clamp-1 text-sm text-gray-500">
+            {bookmark.content.fileName ?? 
+             (bookmark.content.assetId ? 
+              `${bookmark.content.assetId.substring(0, 36)}...` : 
+              "Unknown file")}
+          </Text>
           <ActionBar bookmark={bookmark} />
         </View>
       </View>
@@ -333,6 +340,7 @@ export default function BookmarkCard({
   const { data: bookmark } = api.bookmarks.getBookmark.useQuery(
     {
       bookmarkId: initialData.id,
+      includeContent: true,
     },
     {
       initialData,

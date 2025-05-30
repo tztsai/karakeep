@@ -152,6 +152,14 @@ export default function Dashboard() {
           headerBackTitle: "Back",
         }}
       />
+      <Stack.Screen
+        name="settings/auto-import"
+        options={{
+          title: "Auto Import",
+          headerTitle: "Auto Import",
+          headerBackTitle: "Back",
+        }}
+      />
     </StyledStack>
   );
 }
