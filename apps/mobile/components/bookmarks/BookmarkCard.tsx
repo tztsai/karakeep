@@ -292,9 +292,7 @@ function AssetCard({
   if (bookmark.content.type !== BookmarkTypes.ASSET) {
     throw new Error("Wrong content type rendered");
   }
-  const title = bookmark.title ?? bookmark.content.fileName;
-
-  const assetImage =
+  const assetId =
     bookmark.assets.find((r) => r.assetType == "assetScreenshot")?.id ??
     bookmark.content.assetId;
 
@@ -302,28 +300,25 @@ function AssetCard({
     <View className="flex gap-2">
       <Pressable onPress={onOpenBookmark}>
         <BookmarkAssetImage
-          assetId={assetImage}
+          assetId={assetId}
           className="h-56 min-h-56 w-full object-cover"
         />
       </Pressable>
       <View className="flex gap-2 p-2">
         <Pressable onPress={onOpenBookmark}>
           <Text className="line-clamp-2 text-xl font-bold text-foreground">
-            {title ??
+            {bookmark.title ??
               (bookmark.content.content
-                ? bookmark.content.content.substring(20, 100) +
+                ? bookmark.content.content.substring(0, 80) +
                   (bookmark.content.content.length > 80 ? "..." : "")
-                : "Untitled Asset")}
+                : "")}
           </Text>
         </Pressable>
         <TagList bookmark={bookmark} />
         <Divider orientation="vertical" className="mt-2 h-0.5 w-full" />
         <View className="mt-2 flex flex-row justify-between px-2 pb-2">
           <Text className="my-auto line-clamp-1 text-sm text-gray-500">
-            {bookmark.content.fileName ??
-              (bookmark.content.assetId
-                ? `${bookmark.content.assetId.substring(0, 36)}...`
-                : "Unknown file")}
+            {bookmark.content.fileName ?? ""}
           </Text>
           <ActionBar bookmark={bookmark} />
         </View>

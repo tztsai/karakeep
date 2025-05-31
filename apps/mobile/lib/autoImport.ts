@@ -23,21 +23,28 @@ import { zUploadResponseSchema } from "@karakeep/shared/types/uploads";
 import useAppSettings, { Settings } from "./settings";
 
 const BACKGROUND_FETCH_TASK = "auto-import-task";
+const IMPORTED_FILES_KEY = "auto-imported-files";
 
 interface ImportedImage {
   uri: string;
   filename: string;
   mimeType: string;
-  modificationTime?: number;
+}
+
+interface ImportedFileRecord {
+  sourceUri: string;
+  importTimestamp: number;
 }
 
 class AutoImportService {
   private static instance: AutoImportService;
   private intervalId: NodeJS.Timeout | null = null;
   private isScanning = false;
-  private importedAssets = new Set<string>();
+  private importedFilesCache: ImportedFilesCache;
 
-  private constructor() {}
+  private constructor() {
+    this.importedFilesCache = ImportedFilesCache.getInstance();
+  }
 
   static getInstance(): AutoImportService {
     if (!AutoImportService.instance) {
@@ -48,6 +55,7 @@ class AutoImportService {
 
   async initialize() {
     await this.registerBackgroundTask();
+    await this.importedFilesCache.initialize();
   }
 
   private async registerBackgroundTask() {
@@ -157,35 +165,27 @@ class AutoImportService {
       // Filter for image files
       const imageFiles = files.filter((uri) => getImageMimeType(uri) !== "");
 
-      console.log(`Found ${imageFiles.length} image files in directory`);
-
-      // const lastScanTime = settings.autoImport?.lastScanTimestamp || 0;
       const newImages: ImportedImage[] = [];
 
       for (const fileUri of imageFiles) {
         try {
           // Extract filename from URI
-          const filename = fileUri.split("/").pop() || "unknown";
+          const filename =
+            fileUri.split(/%3A/).pop()?.replace(/%2F/g, "/") || "";
 
           // Get file info to check modification time
           const fileInfo = await getInfoAsync(fileUri);
 
-          if (fileInfo.exists) {
-            // const modificationTime = fileInfo.modificationTime * 1000; // milliseconds
-
-            // Only import images modified after the last scan
-            // if (modificationTime > lastScanTime && !this.importedAssets.has(fileUri)) {
+          // Check if file has been imported using local cache
+          if (fileInfo.exists && !(await this.checkImported(fileUri))) {
             newImages.push({
               uri: fileUri,
               filename: filename,
               mimeType: getImageMimeType(filename),
-              // modificationTime: modificationTime,
             });
-            // }
           }
         } catch (fileError) {
           console.error(`Error getting info for file ${fileUri}:`, fileError);
-          // Continue with other files
         }
       }
 
@@ -210,8 +210,11 @@ class AutoImportService {
         // Create a bookmark for each image
         await this.createImageBookmark(image, settings);
 
-        // Mark as imported to avoid duplicates
-        this.importedAssets.add(image.uri);
+        // Add to local cache to prevent re-importing
+        await this.importedFilesCache.addImportedFile({
+          sourceUri: image.uri,
+          importTimestamp: Date.now(),
+        });
       } catch (error) {
         console.error(`Error importing image ${image.filename}:`, error);
       }
@@ -262,6 +265,7 @@ class AutoImportService {
                 uploadResult.contentType === "application/pdf"
                   ? "pdf"
                   : "image",
+              sourceUrl: image.uri,
             },
           }),
         },
@@ -303,6 +307,132 @@ class AutoImportService {
       );
     } catch (error) {
       console.error("Error updating last scan timestamp:", error);
+    }
+  }
+
+  // Public methods for cache management
+  async getCacheStats() {
+    return await this.importedFilesCache.getStats();
+  }
+
+  async clearImportedFilesCache() {
+    await this.importedFilesCache.clearCache();
+  }
+
+  async getImportedFiles() {
+    return await this.importedFilesCache.getImportedFiles();
+  }
+
+  async checkImported(sourceUri: string) {
+    return await this.importedFilesCache.hasBeenImported(sourceUri);
+  }
+
+  async removeImportedFile(sourceUri: string) {
+    await this.importedFilesCache.removeImportedFile(sourceUri);
+  }
+}
+
+class ImportedFilesCache {
+  private static instance: ImportedFilesCache;
+  private cache: Map<string, ImportedFileRecord> | null = null;
+
+  private constructor() {}
+
+  static getInstance(): ImportedFilesCache {
+    if (!ImportedFilesCache.instance) {
+      ImportedFilesCache.instance = new ImportedFilesCache();
+    }
+    return ImportedFilesCache.instance;
+  }
+
+  async initialize(): Promise<void> {
+    try {
+      const cachedData = await SecureStore.getItemAsync(IMPORTED_FILES_KEY);
+      if (cachedData) {
+        const records: ImportedFileRecord[] = JSON.parse(cachedData);
+        this.cache = new Map(
+          records.map((record) => [record.sourceUri, record]),
+        );
+      } else {
+        this.cache = new Map();
+      }
+      console.log(
+        `Initialized imported files cache with ${this.cache.size} records`,
+      );
+    } catch (error) {
+      console.error("Error initializing imported files cache:", error);
+      this.cache = new Map();
+    }
+  }
+
+  async hasBeenImported(sourceUri: string): Promise<boolean> {
+    if (!this.cache) {
+      await this.initialize();
+    }
+    return this.cache!.has(sourceUri);
+  }
+
+  async addImportedFile(record: ImportedFileRecord): Promise<void> {
+    if (!this.cache) {
+      await this.initialize();
+    }
+
+    this.cache!.set(record.sourceUri, record);
+    await this.persistCache();
+    console.log(`Added imported file record: ${record.sourceUri}`);
+  }
+
+  async removeImportedFile(sourceUri: string): Promise<void> {
+    if (!this.cache) {
+      await this.initialize();
+    }
+
+    this.cache!.delete(sourceUri);
+    await this.persistCache();
+    console.log(`Removed imported file record: ${sourceUri}`);
+  }
+
+  async getImportedFiles(): Promise<ImportedFileRecord[]> {
+    if (!this.cache) {
+      await this.initialize();
+    }
+    return Array.from(this.cache!.values());
+  }
+
+  async clearCache(): Promise<void> {
+    this.cache = new Map();
+    await this.persistCache();
+    console.log("Cleared imported files cache");
+  }
+
+  async getStats(): Promise<{
+    totalFiles: number;
+    oldestImport: number | null;
+    newestImport: number | null;
+  }> {
+    if (!this.cache) {
+      await this.initialize();
+    }
+
+    const records = Array.from(this.cache!.values());
+    const timestamps = records.map((r) => r.importTimestamp);
+
+    return {
+      totalFiles: records.length,
+      oldestImport: timestamps.length > 0 ? Math.min(...timestamps) : null,
+      newestImport: timestamps.length > 0 ? Math.max(...timestamps) : null,
+    };
+  }
+
+  private async persistCache(): Promise<void> {
+    try {
+      const records = Array.from(this.cache!.values());
+      await SecureStore.setItemAsync(
+        IMPORTED_FILES_KEY,
+        JSON.stringify(records),
+      );
+    } catch (error) {
+      console.error("Error persisting imported files cache:", error);
     }
   }
 }
