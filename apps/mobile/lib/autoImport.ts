@@ -6,7 +6,7 @@
  * - AutoImportCore: Minimal core service for background tasks and file operations
  * - useAutoImport: React hook that provides full auto-import functionality using other hooks
  * - useAutoImportLifecycle: App-level lifecycle management hook (used in _layout.tsx)
- * - ImportedFilesCache: SecureStore-based cache for tracking imported files
+ * - ImportedFilesCache: WatermelonDB-based cache for tracking imported files
  */
 
 import { useCallback, useEffect, useRef } from "react";
@@ -16,15 +16,17 @@ import * as BackgroundTask from "expo-background-task";
 import { getInfoAsync, StorageAccessFramework } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 import * as TaskManager from "expo-task-manager";
+import { Q } from "@nozbe/watermelondb";
 
 import { BookmarkTypes } from "@karakeep/shared/types/bookmarks";
 import { zUploadResponseSchema } from "@karakeep/shared/types/uploads";
 
 import useAppSettings, { Settings } from "./settings";
 import { api } from "./trpc";
+import { database } from "./watermelon";
+import ImportedFile from "./watermelon/models/ImportedFile";
 
 const BACKGROUND_FETCH_TASK = "auto-import-task";
-const IMPORTED_FILES_KEY = "auto-imported-files";
 const SETTINGS_SECURE_STORE_KEY = "settings";
 const MINUTES_TO_MS = 60 * 1000;
 
@@ -474,7 +476,6 @@ export function useAutoImportLifecycle() {
 
 class ImportedFilesCache {
   private static instance: ImportedFilesCache;
-  private cache: Map<string, ImportedFileRecord> | null = null;
 
   private constructor() {}
 
@@ -487,62 +488,105 @@ class ImportedFilesCache {
 
   async initialize(): Promise<void> {
     try {
-      const cachedData = await SecureStore.getItemAsync(IMPORTED_FILES_KEY);
-      if (cachedData) {
-        const records: ImportedFileRecord[] = JSON.parse(cachedData);
-        this.cache = new Map(
-          records.map((record) => [record.sourceUri, record]),
-        );
-      } else {
-        this.cache = new Map();
-      }
-      console.log(
-        `Initialized imported files cache with ${this.cache.size} records`,
-      );
+      // WatermelonDB handles initialization automatically
+      // No need to manually load data like with SecureStore
+      const importedFilesCollection =
+        database.get<ImportedFile>("imported_files");
+      const count = await importedFilesCollection.query().fetchCount();
+      console.log(`Initialized imported files cache with ${count} records`);
     } catch (error) {
       console.error("Error initializing imported files cache:", error);
-      this.cache = new Map();
     }
   }
 
   async hasBeenImported(sourceUri: string): Promise<boolean> {
-    if (!this.cache) {
-      await this.initialize();
+    try {
+      const importedFilesCollection =
+        database.get<ImportedFile>("imported_files");
+      const existingRecord = await importedFilesCollection
+        .query(Q.where("source_uri", sourceUri))
+        .fetch();
+      return existingRecord.length > 0;
+    } catch (error) {
+      console.error("Error checking if file has been imported:", error);
+      return false;
     }
-    return this.cache!.has(sourceUri);
   }
 
   async addImportedFile(record: ImportedFileRecord): Promise<void> {
-    if (!this.cache) {
-      await this.initialize();
-    }
+    try {
+      await database.write(async () => {
+        const importedFilesCollection =
+          database.get<ImportedFile>("imported_files");
 
-    this.cache!.set(record.sourceUri, record);
-    await this.persistCache();
-    console.log(`Added imported file record: ${record.sourceUri}`);
+        // Check if record already exists to avoid duplicates
+        const existingRecord = await importedFilesCollection
+          .query(Q.where("source_uri", record.sourceUri))
+          .fetch();
+
+        if (existingRecord.length === 0) {
+          await importedFilesCollection.create((importedFile) => {
+            importedFile.sourceUri = record.sourceUri;
+            importedFile.importTimestamp = new Date(record.importTimestamp);
+          });
+        }
+      });
+      console.log(`Added imported file record: ${record.sourceUri}`);
+    } catch (error) {
+      console.error("Error adding imported file record:", error);
+    }
   }
 
   async removeImportedFile(sourceUri: string): Promise<void> {
-    if (!this.cache) {
-      await this.initialize();
-    }
+    try {
+      await database.write(async () => {
+        const importedFilesCollection =
+          database.get<ImportedFile>("imported_files");
+        const recordsToDelete = await importedFilesCollection
+          .query(Q.where("source_uri", sourceUri))
+          .fetch();
 
-    this.cache!.delete(sourceUri);
-    await this.persistCache();
-    console.log(`Removed imported file record: ${sourceUri}`);
+        for (const record of recordsToDelete) {
+          await record.markAsDeleted();
+        }
+      });
+      console.log(`Removed imported file record: ${sourceUri}`);
+    } catch (error) {
+      console.error("Error removing imported file record:", error);
+    }
   }
 
   async getImportedFiles(): Promise<ImportedFileRecord[]> {
-    if (!this.cache) {
-      await this.initialize();
+    try {
+      const importedFilesCollection =
+        database.get<ImportedFile>("imported_files");
+      const records = await importedFilesCollection.query().fetch();
+
+      return records.map((record) => ({
+        sourceUri: record.sourceUri,
+        importTimestamp: record.importTimestamp.getTime(),
+      }));
+    } catch (error) {
+      console.error("Error getting imported files:", error);
+      return [];
     }
-    return Array.from(this.cache!.values());
   }
 
   async clearCache(): Promise<void> {
-    this.cache = new Map();
-    await this.persistCache();
-    console.log("Cleared imported files cache");
+    try {
+      await database.write(async () => {
+        const importedFilesCollection =
+          database.get<ImportedFile>("imported_files");
+        const allRecords = await importedFilesCollection.query().fetch();
+
+        for (const record of allRecords) {
+          await record.markAsDeleted();
+        }
+      });
+      console.log("Cleared imported files cache");
+    } catch (error) {
+      console.error("Error clearing imported files cache:", error);
+    }
   }
 
   async getStats(): Promise<{
@@ -550,29 +594,25 @@ class ImportedFilesCache {
     oldestImport: number | null;
     newestImport: number | null;
   }> {
-    if (!this.cache) {
-      await this.initialize();
-    }
-
-    const records = Array.from(this.cache!.values());
-    const timestamps = records.map((r) => r.importTimestamp);
-
-    return {
-      totalFiles: records.length,
-      oldestImport: timestamps.length > 0 ? Math.min(...timestamps) : null,
-      newestImport: timestamps.length > 0 ? Math.max(...timestamps) : null,
-    };
-  }
-
-  private async persistCache(): Promise<void> {
     try {
-      const records = Array.from(this.cache!.values());
-      await SecureStore.setItemAsync(
-        IMPORTED_FILES_KEY,
-        JSON.stringify(records),
-      );
+      const importedFilesCollection =
+        database.get<ImportedFile>("imported_files");
+      const records = await importedFilesCollection.query().fetch();
+
+      const timestamps = records.map((r) => r.importTimestamp.getTime());
+
+      return {
+        totalFiles: records.length,
+        oldestImport: timestamps.length > 0 ? Math.min(...timestamps) : null,
+        newestImport: timestamps.length > 0 ? Math.max(...timestamps) : null,
+      };
     } catch (error) {
-      console.error("Error persisting imported files cache:", error);
+      console.error("Error getting imported files stats:", error);
+      return {
+        totalFiles: 0,
+        oldestImport: null,
+        newestImport: null,
+      };
     }
   }
 }
