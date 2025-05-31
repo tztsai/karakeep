@@ -84,11 +84,17 @@
       "expo-background-task",
       "expo-task-manager",
       "expo-document-picker",
+      "@morrowdigital/watermelondb-expo-plugin",
       [
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": true
+            "usesCleartextTraffic": true,
+            "kotlinVersion": "1.9.25",
+            "packagingOptions": {
+              "pickFirst": ["**/libc++_shared.so"]
+            },
+            "suppressKotlinVersionCompatibilityCheck": true
           }
         }
       ],
