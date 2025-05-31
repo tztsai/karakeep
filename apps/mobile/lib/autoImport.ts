@@ -1,30 +1,26 @@
 /**
  * Auto Import Module
- * 
+ *
  * This module provides auto-import functionality for images with a clean, modular architecture:
- * 
+ *
  * - AutoImportService: Core singleton service that handles the auto-import logic
  * - useAutoImport: Basic hook for manual start/stop operations
  * - useAutoImportLifecycle: App-level lifecycle management hook (used in _layout.tsx)
  * - AutoImportTestUtils: Utility functions for testing (used in settings screens)
  */
 
-import { Alert, Platform } from "react-native";
+import { useEffect } from "react";
+import { Alert, AppState, Platform } from "react-native";
+import ReactNativeBlobUtil from "react-native-blob-util";
 import * as BackgroundTask from "expo-background-task";
 import { getInfoAsync, StorageAccessFramework } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 import * as TaskManager from "expo-task-manager";
-import { useEffect } from "react";
-import { AppState } from "react-native";
-
-import useAppSettings, { Settings } from "./settings";
-
-import ReactNativeBlobUtil from "react-native-blob-util";
 
 import { BookmarkTypes } from "@karakeep/shared/types/bookmarks";
-import {
-  zUploadResponseSchema,
-} from "@karakeep/shared/types/uploads";
+import { zUploadResponseSchema } from "@karakeep/shared/types/uploads";
+
+import useAppSettings, { Settings } from "./settings";
 
 const BACKGROUND_FETCH_TASK = "auto-import-task";
 
@@ -154,12 +150,12 @@ class AutoImportService {
       }
 
       console.log(`Scanning folder: ${folderUri}`);
-      
+
       // Get list of files from the selected directory
       const files = await StorageAccessFramework.readDirectoryAsync(folderUri);
-      
+
       // Filter for image files
-      const imageFiles = files.filter(uri => getImageMimeType(uri) !== '');
+      const imageFiles = files.filter((uri) => getImageMimeType(uri) !== "");
 
       console.log(`Found ${imageFiles.length} image files in directory`);
 
@@ -169,22 +165,22 @@ class AutoImportService {
       for (const fileUri of imageFiles) {
         try {
           // Extract filename from URI
-          const filename = fileUri.split('/').pop() || 'unknown';
-          
+          const filename = fileUri.split("/").pop() || "unknown";
+
           // Get file info to check modification time
           const fileInfo = await getInfoAsync(fileUri);
-          
+
           if (fileInfo.exists) {
             // const modificationTime = fileInfo.modificationTime * 1000; // milliseconds
-            
+
             // Only import images modified after the last scan
             // if (modificationTime > lastScanTime && !this.importedAssets.has(fileUri)) {
-              newImages.push({
-                uri: fileUri,
-                filename: filename,
-                mimeType: getImageMimeType(filename),
-                // modificationTime: modificationTime,
-              });
+            newImages.push({
+              uri: fileUri,
+              filename: filename,
+              mimeType: getImageMimeType(filename),
+              // modificationTime: modificationTime,
+            });
             // }
           }
         } catch (fileError) {
@@ -262,7 +258,10 @@ class AutoImportService {
               type: BookmarkTypes.ASSET,
               fileName: image.filename,
               assetId: uploadResult.assetId,
-              assetType: uploadResult.contentType === "application/pdf" ? "pdf" : "image",
+              assetType:
+                uploadResult.contentType === "application/pdf"
+                  ? "pdf"
+                  : "image",
             },
           }),
         },
@@ -270,12 +269,19 @@ class AutoImportService {
 
       if (!bookmarkResponse.ok) {
         const errorText = await bookmarkResponse.text();
-        console.error(`Bookmark creation failed with status ${bookmarkResponse.status}: ${errorText}`);
-        throw new Error(`Bookmark creation failed: ${bookmarkResponse.status} - ${errorText}`);
+        console.error(
+          `Bookmark creation failed with status ${bookmarkResponse.status}: ${errorText}`,
+        );
+        throw new Error(
+          `Bookmark creation failed: ${bookmarkResponse.status} - ${errorText}`,
+        );
       }
 
       const bookmarkResult = await bookmarkResponse.json();
-      console.log(`Successfully created bookmark for ${image.filename}:`, bookmarkResult);
+      console.log(
+        `Successfully created bookmark for ${image.filename}:`,
+        bookmarkResult,
+      );
     } catch (error) {
       console.error(`Error creating bookmark for ${image.filename}:`, error);
       throw error;
@@ -302,21 +308,21 @@ class AutoImportService {
 }
 
 function getImageMimeType(filename: string): string {
-  const extension = filename.toLowerCase().split('.').pop();
+  const extension = filename.toLowerCase().split(".").pop();
   switch (extension) {
-    case 'jpg':
-    case 'jpeg':
-      return 'image/jpeg';
-    case 'png':
-      return 'image/png';
-    case 'gif':
-      return 'image/gif';
-    case 'bmp':
-      return 'image/bmp';
-    case 'webp':
-      return 'image/webp';
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "png":
+      return "image/png";
+    case "gif":
+      return "image/gif";
+    case "bmp":
+      return "image/bmp";
+    case "webp":
+      return "image/webp";
     default:
-      return '';
+      return "";
   }
 }
 
@@ -346,7 +352,10 @@ export function useAutoImportLifecycle() {
       }
     };
 
-    const subscription = AppState.addEventListener("change", handleAppStateChange);
+    const subscription = AppState.addEventListener(
+      "change",
+      handleAppStateChange,
+    );
 
     return () => {
       subscription?.remove();

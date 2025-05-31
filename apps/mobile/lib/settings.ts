@@ -1,10 +1,10 @@
-import * as SecureStore from "expo-secure-store";
-import { z } from "zod";
-import { create } from "zustand";
 import {
   configureReanimatedLogger,
   ReanimatedLogLevel,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
+import * as SecureStore from "expo-secure-store";
+import { z } from "zod";
+import { create } from "zustand";
 
 const SETTING_NAME = "settings";
 

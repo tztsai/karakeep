@@ -1,4 +1,6 @@
-# pnpm typecheck
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+pnpm typecheck
 pnpm format:fix
+echo "$STAGED_FILES" | xargs git add
 # pnpm lint
 # pnpm exec sherif

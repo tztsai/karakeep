@@ -2,13 +2,16 @@ import { useEffect, useState } from "react";
 import { Alert, Switch, Text, View } from "react-native";
 import { Slider } from "react-native-awesome-slider";
 import { useSharedValue } from "react-native-reanimated";
-import { pickDirectory, releaseLongTermAccess, releaseSecureAccess } from '@react-native-documents/picker';
-import { Camera, Clock, Folder, Play } from "lucide-react-native";
-
 import { Button } from "@/components/ui/Button";
 import CustomSafeAreaView from "@/components/ui/CustomSafeAreaView";
 import AutoImportService from "@/lib/autoImport";
 import useAppSettings from "@/lib/settings";
+import {
+  pickDirectory,
+  releaseLongTermAccess,
+  releaseSecureAccess,
+} from "@react-native-documents/picker";
+import { Camera, Clock, Folder, Play } from "lucide-react-native";
 
 export default function AutoImportPage() {
   const { settings, setSettings } = useAppSettings();
@@ -30,7 +33,11 @@ export default function AutoImportPage() {
 
   const handleToggleEnabled = async (enabled: boolean) => {
     // If disabling auto-import and we have a folder with long-term access, release it
-    if (!enabled && autoImport.folderUri && autoImport.bookmarkStatus === "success") {
+    if (
+      !enabled &&
+      autoImport.folderUri &&
+      autoImport.bookmarkStatus === "success"
+    ) {
       try {
         await releaseLongTermAccess([autoImport.folderUri]); // Android
         await releaseSecureAccess([autoImport.folderUri]); // iOS
@@ -46,7 +53,7 @@ export default function AutoImportPage() {
         ...autoImport,
         enabled,
         // Clear bookmark status if disabling
-        ...((!enabled) && { bookmarkStatus: undefined }),
+        ...(!enabled && { bookmarkStatus: undefined }),
       },
     });
   };
@@ -64,11 +71,11 @@ export default function AutoImportPage() {
         const updatedAutoImport = {
           ...autoImport,
           folderUri: result.uri,
-          folderName: result.uri?.split(/%3A/)[1].replace(/%2F/g, "/")
+          folderName: result.uri?.split(/%3A/)[1].replace(/%2F/g, "/"),
         };
 
         // Store bookmark info if available for long-term access
-        if ('bookmarkStatus' in result && result.bookmarkStatus === 'success') {
+        if ("bookmarkStatus" in result && result.bookmarkStatus === "success") {
           updatedAutoImport.bookmarkStatus = result.bookmarkStatus;
         }
 
@@ -79,9 +86,9 @@ export default function AutoImportPage() {
       }
     } catch (error) {
       // Handle user cancellation gracefully
-      if (error && typeof error === 'object' && 'code' in error) {
+      if (error && typeof error === "object" && "code" in error) {
         const err = error as { code: string };
-        if (err.code === 'DOCUMENT_PICKER_CANCELED') {
+        if (err.code === "DOCUMENT_PICKER_CANCELED") {
           return; // User cancelled, don't show error
         }
       }

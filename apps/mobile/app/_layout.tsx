@@ -22,7 +22,7 @@ function NavigationReadyStack() {
   const { hasShareIntent } = useShareIntent();
   const { colorScheme, setColorScheme } = useColorScheme();
   const { settings } = useAppSettings();
-  
+
   useEffect(() => {
     if (hasShareIntent) {
       router.replace({
@@ -30,7 +30,7 @@ function NavigationReadyStack() {
       });
     }
   }, [hasShareIntent, router]);
-  
+
   useEffect(() => {
     setColorScheme(settings.theme);
   }, [settings.theme, setColorScheme]);

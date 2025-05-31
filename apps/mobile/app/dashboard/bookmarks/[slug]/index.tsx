@@ -305,9 +305,9 @@ export default function ListView() {
     data: bookmark,
     error,
     refetch,
-  } = api.bookmarks.getBookmark.useQuery({ 
+  } = api.bookmarks.getBookmark.useQuery({
     bookmarkId: slug,
-    includeContent: true 
+    includeContent: true,
   });
 
   if (error) {
