@@ -11,7 +11,7 @@ import {
   releaseLongTermAccess,
   releaseSecureAccess,
 } from "@react-native-documents/picker";
-import { Camera, Clock, Folder, Play } from "lucide-react-native";
+import { Camera, Clock, Folder } from "lucide-react-native";
 
 export default function AutoImportPage() {
   const { settings, setSettings } = useAppSettings();
@@ -240,25 +240,17 @@ export default function AutoImportPage() {
         </View>
 
         {/* Last Scan Status */}
-        <View className="mb-4 rounded-lg bg-white px-4 py-4 dark:bg-accent">
-          <Text className="mb-2 text-lg text-accent-foreground">Last Scan</Text>
-          <Text className="text-sm text-muted-foreground">
-            {getLastScanText()}
-          </Text>
-        </View>
-
-        {/* Test Scan Button */}
-        <View className="mb-4 rounded-lg bg-white px-4 py-4 dark:bg-accent">
-          <View className="mb-3 flex flex-row items-center gap-3">
-            <Play size={20} className="text-accent-foreground" />
-            <Text className="text-lg text-accent-foreground">Test Scan</Text>
+        <View className="mb-4 flex-row items-center justify-between rounded-lg bg-white px-4 py-4 dark:bg-accent">
+          <View className="mr-3 flex-1">
+            <Text className="mb-2 text-lg text-accent-foreground">
+              Last Scan
+            </Text>
+            <Text className="text-sm text-muted-foreground">
+              {getLastScanText()}
+            </Text>
           </View>
-          <Text className="mb-3 text-sm text-muted-foreground">
-            Test the photo scanning functionality to see what images would be
-            imported.
-          </Text>
           <Button
-            label={isScanning ? "Scanning..." : "Run Test Scan"}
+            label={isScanning ? "Scanning..." : "Run Scan"}
             onPress={startScan}
             disabled={isScanning}
           />

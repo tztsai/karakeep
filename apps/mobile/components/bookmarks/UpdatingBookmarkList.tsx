@@ -1,3 +1,4 @@
+import { Pressable, Text, View } from "react-native";
 import { api } from "@/lib/trpc";
 
 import type { ZGetBookmarksRequest } from "@karakeep/shared/types/bookmarks";
@@ -31,29 +32,33 @@ export default function UpdatingBookmarkList({
     },
   );
 
-  if (error) {
-    return <FullPageError error={error.message} onRetry={() => refetch()} />;
-  }
-
-  if (isPending || !data) {
-    return <FullPageSpinner />;
-  }
-
   const onRefresh = () => {
     apiUtils.bookmarks.getBookmarks.invalidate();
     apiUtils.bookmarks.getBookmark.invalidate();
   };
 
+  // Always render header if provided
   return (
-    <BookmarkList
-      bookmarks={data.pages
-        .flatMap((p) => p.bookmarks)
-        .filter((b) => b.content.type != BookmarkTypes.UNKNOWN)}
-      header={header}
-      onRefresh={onRefresh}
-      fetchNextPage={fetchNextPage}
-      isFetchingNextPage={isFetchingNextPage}
-      isRefreshing={isPending || isPlaceholderData}
-    />
+    <View className="flex-1">
+      {header}
+
+      {error ? (
+        <FullPageError error={error.message} onRetry={() => refetch()} />
+      ) : isPending || !data ? (
+        <View className="flex-1 items-center justify-center">
+          <FullPageSpinner />
+        </View>
+      ) : (
+        <BookmarkList
+          bookmarks={data.pages
+            .flatMap((p) => p.bookmarks)
+            .filter((b) => b.content.type != BookmarkTypes.UNKNOWN)}
+          onRefresh={onRefresh}
+          fetchNextPage={fetchNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          isRefreshing={isPending || isPlaceholderData}
+        />
+      )}
+    </View>
   );
 }
