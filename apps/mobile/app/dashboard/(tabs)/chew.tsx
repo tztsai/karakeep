@@ -6,6 +6,7 @@ import UpdatingBookmarkList from "@/components/bookmarks/UpdatingBookmarkList";
 import AddItemModal from "@/components/chew/AddItemModal";
 import { TailwindResolver } from "@/components/TailwindResolver";
 import CustomSafeAreaView from "@/components/ui/CustomSafeAreaView";
+import { Input } from "@/components/ui/Input";
 import {
   Filter,
   Grid,
@@ -14,6 +15,7 @@ import {
   Search,
   Settings,
 } from "lucide-react-native";
+import { useDebounce } from "use-debounce";
 
 type ViewMode = "list" | "card";
 
@@ -103,11 +105,17 @@ function ViewModeToggle({
 export default function Chew() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const [debouncedSearch] = useDebounce(search, 300);
+
+  // Create dynamic query that includes search text and archived filter
+  const query = { text: debouncedSearch };
 
   return (
     <CustomSafeAreaView>
       <UpdatingBookmarkList
-        query={{ archived: false }}
+        query={query}
         header={
           <View className="mt-5 flex flex-col gap-3">
             <View className="flex flex-row items-center justify-between">
@@ -120,18 +128,22 @@ export default function Chew() {
             </View>
 
             <View className="flex flex-row items-center gap-2">
-              <Pressable
-                className="flex flex-1 flex-row items-center gap-2 rounded-lg border border-input bg-background px-4 py-2.5"
-                onPress={() => router.push("/dashboard/search")}
-              >
+              <View className="flex flex-1 flex-row items-center gap-0 rounded-lg border border-input bg-background px-4 py-0.5">
                 <TailwindResolver
                   className="text-muted-foreground"
                   comp={(styles) => (
-                    <Search size={16} color={styles?.color?.toString()} />
+                    <Search size={18} color={styles?.color?.toString()} />
                   )}
                 />
-                <Text className="text-muted-foreground">Search & Filter</Text>
-              </Pressable>
+                <Input
+                  placeholder="Search & Filter"
+                  className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground"
+                  style={{ height: 34, borderWidth: 0 }}
+                  value={search}
+                  onChangeText={setSearch}
+                  autoCapitalize="none"
+                />
+              </View>
 
               <Pressable
                 className="rounded-lg border border-input bg-background p-2.5"
@@ -140,7 +152,7 @@ export default function Chew() {
                   // TODO: Open filter modal
                 }}
               >
-                <Filter size={16} color="rgb(0, 122, 255)" />
+                <Filter size={20} color="rgb(0, 122, 255)" />
               </Pressable>
             </View>
           </View>
