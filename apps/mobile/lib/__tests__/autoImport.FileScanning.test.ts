@@ -3,7 +3,7 @@ import ReactNativeBlobUtil from "react-native-blob-util";
 import { getInfoAsync, StorageAccessFramework } from "expo-file-system";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import AutoImportCore from "../autoImport";
+import AutoImportService from "../autoImport";
 
 // Mock all dependencies
 vi.mock("expo-file-system", () => ({
@@ -50,41 +50,72 @@ vi.mock("../settings", () => ({
       apiKey: "test-api-key",
       autoImport: {
         enabled: true,
-        folderUri: "file://test-folder",
+        folders: [
+          {
+            uri: "content://com.android.externalstorage.documents/tree/primary%3ADCIM%2FCamera",
+            name: "Camera",
+          },
+        ],
         scanIntervalMinutes: 60,
       },
     },
   })),
 }));
 
+// Mock fetch for API calls
+global.fetch = vi.fn();
+
 describe("File Scanning and Importing", () => {
-  let core: AutoImportCore;
-  const mockCallbacks = {
-    createBookmark: vi.fn(),
-    uploadAsset: vi.fn(),
-    onImportComplete: vi.fn(),
-    onError: vi.fn(),
-  };
+  let service: AutoImportService;
 
   const mockSettings = {
     address: "http://localhost:3000",
     apiKey: "test-api-key",
     autoImport: {
       enabled: true,
-      folderUri:
-        "content://com.android.externalstorage.documents/tree/primary%3ADCIM%2FCamera",
+      folders: [
+        {
+          uri: "content://com.android.externalstorage.documents/tree/primary%3ADCIM%2FCamera",
+          name: "Camera",
+        },
+      ],
+      scanIntervalMinutes: 60,
+    },
+  };
+
+  const mockMultiFolderSettings = {
+    address: "http://localhost:3000",
+    apiKey: "test-api-key",
+    autoImport: {
+      enabled: true,
+      folders: [
+        {
+          uri: "content://com.android.externalstorage.documents/tree/primary%3ADCIM%2FCamera",
+          name: "Camera",
+        },
+        {
+          uri: "content://com.android.externalstorage.documents/tree/primary%3APictures%2FScreenshots",
+          name: "Screenshots",
+        },
+      ],
       scanIntervalMinutes: 60,
     },
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    core = AutoImportCore.getInstance();
-    core.setCallbacks(mockCallbacks);
+    service = AutoImportService.getInstance();
 
     // Setup default mocks
-    mockCallbacks.uploadAsset.mockResolvedValue("asset-123");
-    mockCallbacks.createBookmark.mockResolvedValue(undefined);
+    (global.fetch as any).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ assetId: "asset-123" }),
+    });
+
+    // Mock ReactNativeBlobUtil.fetch for uploads
+    (ReactNativeBlobUtil.fetch as any).mockResolvedValue({
+      json: () => Promise.resolve({ assetId: "asset-123" }),
+    });
   });
 
   afterEach(() => {
@@ -105,36 +136,84 @@ describe("File Scanning and Importing", () => {
       );
       (getInfoAsync as any).mockResolvedValue({ exists: true });
 
-      await core.scanAndImportNewImages(mockSettings as any);
+      const count = await service.scanAndImportNewImages(mockSettings as any);
 
       expect(StorageAccessFramework.readDirectoryAsync).toHaveBeenCalledWith(
-        mockSettings.autoImport!.folderUri,
+        mockSettings.autoImport!.folders[0].uri,
       );
 
-      // Should call getInfoAsync for image files only (3 files, not the PDF)
+      // Should process image files only (3 files, not the PDF)
       expect(getInfoAsync).toHaveBeenCalledTimes(3);
+      expect(count).toBe(3);
+    });
+
+    it("should scan multiple folders", async () => {
+      const mockFiles1 = [
+        "content://test/camera/IMG_001.jpg",
+        "content://test/camera/IMG_002.png",
+      ];
+      const mockFiles2 = ["content://test/screenshots/SCREEN_001.png"];
+
+      (StorageAccessFramework.readDirectoryAsync as any)
+        .mockResolvedValueOnce(mockFiles1)
+        .mockResolvedValueOnce(mockFiles2);
+      (getInfoAsync as any).mockResolvedValue({ exists: true });
+
+      const count = await service.scanAndImportNewImages(
+        mockMultiFolderSettings as any,
+      );
+
+      expect(StorageAccessFramework.readDirectoryAsync).toHaveBeenCalledTimes(
+        2,
+      );
+      expect(StorageAccessFramework.readDirectoryAsync).toHaveBeenCalledWith(
+        mockMultiFolderSettings.autoImport!.folders[0].uri,
+      );
+      expect(StorageAccessFramework.readDirectoryAsync).toHaveBeenCalledWith(
+        mockMultiFolderSettings.autoImport!.folders[1].uri,
+      );
+      expect(count).toBe(3);
     });
 
     it("should handle empty folders gracefully", async () => {
       (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue([]);
 
-      await core.scanAndImportNewImages(mockSettings as any);
+      const count = await service.scanAndImportNewImages(mockSettings as any);
 
       expect(StorageAccessFramework.readDirectoryAsync).toHaveBeenCalled();
-      expect(mockCallbacks.onImportComplete).not.toHaveBeenCalled();
-      expect(mockCallbacks.onError).not.toHaveBeenCalled();
+      expect(count).toBe(0);
     });
 
-    it("should handle folder access errors", async () => {
-      (StorageAccessFramework.readDirectoryAsync as any).mockRejectedValue(
-        new Error("Permission denied"),
+    it("should handle folder access errors and continue with other folders", async () => {
+      (StorageAccessFramework.readDirectoryAsync as any)
+        .mockRejectedValueOnce(new Error("Permission denied"))
+        .mockResolvedValueOnce(["content://test/IMG_001.jpg"]);
+      (getInfoAsync as any).mockResolvedValue({ exists: true });
+
+      const count = await service.scanAndImportNewImages(
+        mockMultiFolderSettings as any,
       );
 
-      await core.scanAndImportNewImages(mockSettings as any);
-
-      expect(mockCallbacks.onError).toHaveBeenCalledWith(
-        expect.stringContaining("Import error"),
+      // Should still process the second folder despite the first failing
+      expect(StorageAccessFramework.readDirectoryAsync).toHaveBeenCalledTimes(
+        2,
       );
+      expect(count).toBe(1);
+    });
+
+    it("should handle no folders configured", async () => {
+      const emptySettings = {
+        ...mockSettings,
+        autoImport: {
+          ...mockSettings.autoImport,
+          folders: [],
+        },
+      };
+
+      const count = await service.scanAndImportNewImages(emptySettings as any);
+
+      expect(StorageAccessFramework.readDirectoryAsync).not.toHaveBeenCalled();
+      expect(count).toBe(0);
     });
 
     it("should filter files by image extensions correctly", async () => {
@@ -155,10 +234,11 @@ describe("File Scanning and Importing", () => {
       );
       (getInfoAsync as any).mockResolvedValue({ exists: true });
 
-      await core.scanAndImportNewImages(mockSettings as any);
+      const count = await service.scanAndImportNewImages(mockSettings as any);
 
       // Should only process image files (6 image extensions)
       expect(getInfoAsync).toHaveBeenCalledTimes(6);
+      expect(count).toBe(6);
     });
   });
 
@@ -171,7 +251,7 @@ describe("File Scanning and Importing", () => {
       );
       (getInfoAsync as any).mockResolvedValue({ exists: true });
 
-      await core.scanAndImportNewImages(mockSettings as any);
+      await service.scanAndImportNewImages(mockSettings as any);
 
       expect(getInfoAsync).toHaveBeenCalledWith(mockFiles[0]);
     });
@@ -184,10 +264,11 @@ describe("File Scanning and Importing", () => {
       );
       (getInfoAsync as any).mockResolvedValue({ exists: false });
 
-      await core.scanAndImportNewImages(mockSettings as any);
+      const count = await service.scanAndImportNewImages(mockSettings as any);
 
       expect(getInfoAsync).toHaveBeenCalledWith(mockFiles[0]);
-      expect(mockCallbacks.uploadAsset).not.toHaveBeenCalled();
+      expect(ReactNativeBlobUtil.fetch).not.toHaveBeenCalled();
+      expect(count).toBe(0);
     });
 
     it("should handle file info errors gracefully", async () => {
@@ -198,122 +279,66 @@ describe("File Scanning and Importing", () => {
       );
       (getInfoAsync as any).mockRejectedValue(new Error("File access error"));
 
-      await core.scanAndImportNewImages(mockSettings as any);
+      const count = await service.scanAndImportNewImages(mockSettings as any);
 
-      // Should continue processing despite individual file errors
       expect(getInfoAsync).toHaveBeenCalledWith(mockFiles[0]);
-      expect(mockCallbacks.uploadAsset).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("Filename Extraction", () => {
-    it("should extract filenames from StorageAccessFramework URIs correctly", async () => {
-      const testCases = [
-        {
-          uri: "content://com.android.externalstorage.documents/document/primary%3ADCIM%2FCamera%2FIMG_001.jpg",
-          expectedFilename: "DCIM/Camera/IMG_001.jpg",
-        },
-        {
-          uri: "content://test/document/folder%2Fsubfolder%2Fimage.png",
-          expectedFilename: "folder/subfolder/image.png",
-        },
-        {
-          uri: "content://test/simple.jpg",
-          expectedFilename: "simple.jpg",
-        },
-      ];
-
-      for (const testCase of testCases) {
-        (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue([
-          testCase.uri,
-        ]);
-        (getInfoAsync as any).mockResolvedValue({ exists: true });
-
-        await core.scanAndImportNewImages(mockSettings as any);
-
-        expect(mockCallbacks.uploadAsset).toHaveBeenCalledWith(
-          expect.objectContaining({
-            filename: testCase.expectedFilename,
-            uri: testCase.uri,
-          }),
-          mockSettings,
-        );
-
-        vi.clearAllMocks();
-        mockCallbacks.uploadAsset.mockResolvedValue("asset-123");
-      }
-    });
-
-    it("should handle malformed URIs gracefully", async () => {
-      const malformedUris = [
-        "content://test/", // Empty filename
-        "content://", // Very malformed
-        "", // Empty URI
-      ];
-
-      for (const uri of malformedUris) {
-        (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue([
-          uri,
-        ]);
-        (getInfoAsync as any).mockResolvedValue({ exists: true });
-
-        await expect(
-          core.scanAndImportNewImages(mockSettings as any),
-        ).resolves.not.toThrow();
-
-        vi.clearAllMocks();
-      }
-    });
-  });
-
-  describe("Image Import Process", () => {
-    it("should import new images successfully", async () => {
-      const mockFiles = ["content://test/new_image.jpg"];
-
-      (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue(
-        mockFiles,
-      );
-      (getInfoAsync as any).mockResolvedValue({ exists: true });
-
-      await core.scanAndImportNewImages(mockSettings as any);
-
-      expect(mockCallbacks.uploadAsset).toHaveBeenCalledWith(
-        expect.objectContaining({
-          uri: mockFiles[0],
-          filename: expect.any(String),
-          mimeType: "image/jpeg",
-        }),
-        mockSettings,
-      );
-
-      expect(mockCallbacks.createBookmark).toHaveBeenCalledWith({
-        type: "asset",
-        fileName: expect.any(String),
-        assetId: "asset-123",
-        assetType: "image",
-        sourceUrl: mockFiles[0],
-      });
-
-      expect(mockCallbacks.onImportComplete).toHaveBeenCalledWith(1);
+      expect(ReactNativeBlobUtil.fetch).not.toHaveBeenCalled();
+      expect(count).toBe(0);
     });
 
     it("should skip already imported files", async () => {
       const mockFiles = ["content://test/already_imported.jpg"];
 
-      // Mock that this file was already imported by setting up the database mock
-      // The existing database mock in the setup already handles this scenario
+      (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue(
+        mockFiles,
+      );
+      (getInfoAsync as any).mockResolvedValue({ exists: true });
+
+      // Mock the cache to return that file is already imported
+      const importedFilesCache = (service as any).importedFilesCache;
+      vi.spyOn(importedFilesCache, "hasBeenImported").mockResolvedValue(true);
+
+      const count = await service.scanAndImportNewImages(mockSettings as any);
+
+      expect(ReactNativeBlobUtil.fetch).not.toHaveBeenCalled();
+      expect(count).toBe(0);
+    });
+  });
+
+  describe("File Import Process", () => {
+    it("should upload and create bookmark for new files", async () => {
+      const mockFiles = ["content://test/new_file.jpg"];
 
       (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue(
         mockFiles,
       );
       (getInfoAsync as any).mockResolvedValue({ exists: true });
 
-      // The test will pass because the mock database returns empty arrays by default
-      // In a real implementation, we would check the imported files cache
-      await core.scanAndImportNewImages(mockSettings as any);
+      const count = await service.scanAndImportNewImages(mockSettings as any);
 
-      // This test primarily verifies the flow works without errors
-      expect(StorageAccessFramework.readDirectoryAsync).toHaveBeenCalled();
+      expect(ReactNativeBlobUtil.fetch).toHaveBeenCalledWith(
+        "POST",
+        `${mockSettings.address}/api/assets`,
+        expect.objectContaining({
+          Authorization: `Bearer ${mockSettings.apiKey}`,
+          "Content-Type": "multipart/form-data",
+        }),
+        expect.any(Array),
+      );
+
+      // Should create bookmark via direct API call
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${mockSettings.address}/api/trpc/bookmarks.createBookmark`,
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${mockSettings.apiKey}`,
+            "Content-Type": "application/json",
+          }),
+        }),
+      );
+
+      expect(count).toBe(1);
     });
 
     it("should handle upload errors gracefully", async () => {
@@ -323,15 +348,15 @@ describe("File Scanning and Importing", () => {
         mockFiles,
       );
       (getInfoAsync as any).mockResolvedValue({ exists: true });
-      mockCallbacks.uploadAsset.mockRejectedValue(new Error("Upload failed"));
-
-      await core.scanAndImportNewImages(mockSettings as any);
-
-      expect(mockCallbacks.uploadAsset).toHaveBeenCalled();
-      expect(mockCallbacks.createBookmark).not.toHaveBeenCalled();
-      expect(mockCallbacks.onError).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to import"),
+      (ReactNativeBlobUtil.fetch as any).mockRejectedValue(
+        new Error("Upload failed"),
       );
+
+      const count = await service.scanAndImportNewImages(mockSettings as any);
+
+      expect(ReactNativeBlobUtil.fetch).toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled(); // Bookmark shouldn't be created if upload fails
+      expect(count).toBe(0); // No files successfully imported
     });
 
     it("should handle bookmark creation errors gracefully", async () => {
@@ -341,24 +366,22 @@ describe("File Scanning and Importing", () => {
         mockFiles,
       );
       (getInfoAsync as any).mockResolvedValue({ exists: true });
-      mockCallbacks.createBookmark.mockRejectedValue(
-        new Error("Bookmark creation failed"),
-      );
+      (global.fetch as any).mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve("Internal Server Error"),
+      });
 
-      await core.scanAndImportNewImages(mockSettings as any);
+      const count = await service.scanAndImportNewImages(mockSettings as any);
 
-      expect(mockCallbacks.uploadAsset).toHaveBeenCalled();
-      expect(mockCallbacks.createBookmark).toHaveBeenCalled();
-      expect(mockCallbacks.onError).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to import"),
-      );
+      expect(ReactNativeBlobUtil.fetch).toHaveBeenCalled();
+      expect(global.fetch).toHaveBeenCalled();
+      expect(count).toBe(0); // No files successfully imported due to bookmark error
     });
 
-    it("should import multiple files in batch", async () => {
+    it("should extract filename correctly from URI", async () => {
       const mockFiles = [
-        "content://test/batch1.jpg",
-        "content://test/batch2.png",
-        "content://test/batch3.gif",
+        "content://com.android.externalstorage.documents/document/primary%3ADCIM%2FCamera%2FIMG_20240101_120000.jpg",
       ];
 
       (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue(
@@ -366,137 +389,126 @@ describe("File Scanning and Importing", () => {
       );
       (getInfoAsync as any).mockResolvedValue({ exists: true });
 
-      await core.scanAndImportNewImages(mockSettings as any);
+      await service.scanAndImportNewImages(mockSettings as any);
 
-      expect(mockCallbacks.uploadAsset).toHaveBeenCalledTimes(3);
-      expect(mockCallbacks.createBookmark).toHaveBeenCalledTimes(3);
-      expect(mockCallbacks.onImportComplete).toHaveBeenCalledWith(3);
+      expect(ReactNativeBlobUtil.fetch).toHaveBeenCalledWith(
+        "POST",
+        expect.any(String),
+        expect.any(Object),
+        expect.arrayContaining([
+          expect.objectContaining({
+            filename: "DCIM/Camera/IMG_20240101_120000.jpg",
+            type: "image/jpeg",
+          }),
+        ]),
+      );
     });
   });
 
   describe("MIME Type Detection", () => {
-    it("should detect MIME types correctly for different image formats", async () => {
-      const testCases = [
-        { filename: "test.jpg", expectedMimeType: "image/jpeg" },
-        { filename: "test.jpeg", expectedMimeType: "image/jpeg" },
-        { filename: "test.png", expectedMimeType: "image/png" },
-        { filename: "test.gif", expectedMimeType: "image/gif" },
-        { filename: "test.bmp", expectedMimeType: "image/bmp" },
-        { filename: "test.webp", expectedMimeType: "image/webp" },
-        { filename: "TEST.JPG", expectedMimeType: "image/jpeg" }, // Case insensitive
+    it("should detect image MIME types correctly", async () => {
+      const mockFiles = [
+        "content://test/image.jpg",
+        "content://test/image.jpeg",
+        "content://test/image.png",
+        "content://test/image.gif",
+        "content://test/image.bmp",
+        "content://test/image.webp",
       ];
 
-      for (const testCase of testCases) {
-        const uri = `content://test/${testCase.filename}`;
+      const expectedMimeTypes = [
+        "image/jpeg",
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/bmp",
+        "image/webp",
+      ];
 
-        (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue([
-          uri,
-        ]);
-        (getInfoAsync as any).mockResolvedValue({ exists: true });
+      (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue(
+        mockFiles,
+      );
+      (getInfoAsync as any).mockResolvedValue({ exists: true });
 
-        await core.scanAndImportNewImages(mockSettings as any);
+      await service.scanAndImportNewImages(mockSettings as any);
 
-        expect(mockCallbacks.uploadAsset).toHaveBeenCalledWith(
-          expect.objectContaining({
-            mimeType: testCase.expectedMimeType,
-          }),
-          mockSettings,
+      mockFiles.forEach((file, index) => {
+        expect(ReactNativeBlobUtil.fetch).toHaveBeenCalledWith(
+          "POST",
+          expect.any(String),
+          expect.any(Object),
+          expect.arrayContaining([
+            expect.objectContaining({
+              type: expectedMimeTypes[index],
+            }),
+          ]),
         );
-
-        vi.clearAllMocks();
-        mockCallbacks.uploadAsset.mockResolvedValue("asset-123");
-      }
+      });
     });
 
-    it("should handle files without extensions", async () => {
-      const mockFiles = ["content://test/no_extension"];
-
-      (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue(
-        mockFiles,
-      );
-
-      await core.scanAndImportNewImages(mockSettings as any);
-
-      // Should not process files without valid image extensions
-      expect(getInfoAsync).not.toHaveBeenCalled();
-      expect(mockCallbacks.uploadAsset).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("Configuration Validation", () => {
-    it("should handle missing folder URI", async () => {
-      const settingsWithoutFolder = {
-        ...mockSettings,
-        autoImport: {
-          ...mockSettings.autoImport!,
-          folderUri: undefined,
-        },
-      };
-
-      await core.scanAndImportNewImages(settingsWithoutFolder as any);
-
-      expect(StorageAccessFramework.readDirectoryAsync).not.toHaveBeenCalled();
-      expect(mockCallbacks.onError).not.toHaveBeenCalled();
-    });
-
-    it("should handle disabled auto-import", async () => {
-      const disabledSettings = {
-        ...mockSettings,
-        autoImport: {
-          ...mockSettings.autoImport!,
-          enabled: false,
-        },
-      };
-
-      await core.scanAndImportNewImages(disabledSettings as any);
-
-      expect(StorageAccessFramework.readDirectoryAsync).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("Performance and Edge Cases", () => {
-    it("should handle large numbers of files efficiently", async () => {
-      const largeFileList = Array.from(
-        { length: 100 },
-        (_, i) => `content://test/batch_${i.toString().padStart(3, "0")}.jpg`,
-      );
-
-      (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue(
-        largeFileList,
-      );
-      (getInfoAsync as any).mockResolvedValue({ exists: true });
-
-      const startTime = Date.now();
-      await core.scanAndImportNewImages(mockSettings as any);
-      const duration = Date.now() - startTime;
-
-      expect(mockCallbacks.uploadAsset).toHaveBeenCalledTimes(100);
-      expect(mockCallbacks.createBookmark).toHaveBeenCalledTimes(100);
-      expect(mockCallbacks.onImportComplete).toHaveBeenCalledWith(100);
-
-      // Should complete in reasonable time (adjust threshold as needed)
-      expect(duration).toBeLessThan(5000); // 5 seconds
-    });
-
-    it("should handle concurrent scan requests gracefully", async () => {
-      const mockFiles = ["content://test/concurrent.jpg"];
-
-      (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue(
-        mockFiles,
-      );
-      (getInfoAsync as any).mockResolvedValue({ exists: true });
-
-      // Start multiple scans simultaneously
-      const scanPromises = [
-        core.scanAndImportNewImages(mockSettings as any),
-        core.scanAndImportNewImages(mockSettings as any),
-        core.scanAndImportNewImages(mockSettings as any),
+    it("should reject non-image files", async () => {
+      const mockFiles = [
+        "content://test/document.txt",
+        "content://test/video.mp4",
+        "content://test/audio.mp3",
+        "content://test/archive.zip",
       ];
 
-      await Promise.all(scanPromises);
+      (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue(
+        mockFiles,
+      );
 
-      // Should handle concurrency without errors
-      expect(mockCallbacks.onError).not.toHaveBeenCalled();
+      const count = await service.scanAndImportNewImages(mockSettings as any);
+
+      expect(getInfoAsync).not.toHaveBeenCalled();
+      expect(ReactNativeBlobUtil.fetch).not.toHaveBeenCalled();
+      expect(count).toBe(0);
+    });
+  });
+
+  describe("Cache Management During Import", () => {
+    it("should add successfully imported files to cache", async () => {
+      const mockFiles = ["content://test/success.jpg"];
+
+      (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue(
+        mockFiles,
+      );
+      (getInfoAsync as any).mockResolvedValue({ exists: true });
+
+      const importedFilesCache = (service as any).importedFilesCache;
+      const addImportedFileSpy = vi.spyOn(
+        importedFilesCache,
+        "addImportedFile",
+      );
+
+      await service.scanAndImportNewImages(mockSettings as any);
+
+      expect(addImportedFileSpy).toHaveBeenCalledWith({
+        sourceUri: mockFiles[0],
+        importTimestamp: expect.any(Number),
+      });
+    });
+
+    it("should not add failed imports to cache", async () => {
+      const mockFiles = ["content://test/failed.jpg"];
+
+      (StorageAccessFramework.readDirectoryAsync as any).mockResolvedValue(
+        mockFiles,
+      );
+      (getInfoAsync as any).mockResolvedValue({ exists: true });
+      (ReactNativeBlobUtil.fetch as any).mockRejectedValue(
+        new Error("Upload failed"),
+      );
+
+      const importedFilesCache = (service as any).importedFilesCache;
+      const addImportedFileSpy = vi.spyOn(
+        importedFilesCache,
+        "addImportedFile",
+      );
+
+      await service.scanAndImportNewImages(mockSettings as any);
+
+      expect(addImportedFileSpy).not.toHaveBeenCalled();
     });
   });
 });

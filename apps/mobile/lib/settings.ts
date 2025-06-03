@@ -17,15 +17,23 @@ const zSettingsSchema = z.object({
   autoImport: z
     .object({
       enabled: z.boolean().default(false),
-      folderUri: z.string().optional(),
-      folderName: z.string().optional(),
+      folders: z
+        .array(
+          z.object({
+            uri: z.string(),
+            name: z.string(),
+            bookmarkStatus: z.enum(["success", "error"]).optional(),
+          }),
+        )
+        .optional()
+        .default([]),
       scanIntervalMinutes: z.number().default(30),
       lastScanTimestamp: z.number().optional(),
-      bookmarkStatus: z.enum(["success", "error"]).optional(),
     })
     .optional()
     .default({
       enabled: false,
+      folders: [],
       scanIntervalMinutes: 30,
     }),
 });
@@ -52,6 +60,7 @@ const useSettings = create<AppSettingsState>((set, get) => ({
       theme: "system",
       autoImport: {
         enabled: false,
+        folders: [],
         scanIntervalMinutes: 30,
       },
     },

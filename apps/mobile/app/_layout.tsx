@@ -11,7 +11,7 @@ import { ShareIntentProvider, useShareIntent } from "expo-share-intent";
 import { StatusBar } from "expo-status-bar";
 import { StyledStack } from "@/components/navigation/stack";
 import FullPageSpinner from "@/components/ui/FullPageSpinner";
-import { useAutoImportLifecycle } from "@/lib/autoImport";
+import { useAutoImport } from "@/lib/autoImport";
 import { Providers } from "@/lib/providers";
 import useAppSettings from "@/lib/settings";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,7 @@ function NavigationReadyStack() {
   }, [settings.theme, setColorScheme]);
 
   // Initialize auto-import lifecycle management
-  useAutoImportLifecycle();
+  useAutoImport();
 
   return (
     <StyledStack

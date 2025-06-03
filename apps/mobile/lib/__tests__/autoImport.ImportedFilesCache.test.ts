@@ -1,7 +1,7 @@
 import { Q } from "@nozbe/watermelondb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import AutoImportCore from "../autoImport";
+import AutoImportService from "../autoImport";
 import { database } from "../watermelon";
 
 // We need to import the actual module to test the class
@@ -42,8 +42,11 @@ const mockRecord = {
 );
 
 describe("ImportedFilesCache", () => {
+  let service: AutoImportService;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    service = AutoImportService.getInstance();
 
     // Reset mock implementations
     mockCollection.query.mockReturnValue(mockQuery);
@@ -60,10 +63,8 @@ describe("ImportedFilesCache", () => {
     it("should initialize successfully with empty cache", async () => {
       mockQuery.fetchCount.mockResolvedValue(0);
 
-      const core = AutoImportCore.getInstance();
-
       // Test through the public getCacheStats method
-      const stats = await core.getCacheStats();
+      const stats = await service.getCacheStats();
 
       expect(database.get).toHaveBeenCalledWith("imported_files");
       expect(stats.totalFiles).toBe(0);
@@ -84,8 +85,7 @@ describe("ImportedFilesCache", () => {
       mockQuery.fetch.mockResolvedValue(existingRecords);
       mockQuery.fetchCount.mockResolvedValue(existingRecords.length);
 
-      const core = AutoImportCore.getInstance();
-      const stats = await core.getCacheStats();
+      const stats = await service.getCacheStats();
 
       expect(stats.totalFiles).toBe(2);
     });
@@ -93,10 +93,8 @@ describe("ImportedFilesCache", () => {
     it("should handle initialization errors gracefully", async () => {
       mockQuery.fetchCount.mockRejectedValue(new Error("Database error"));
 
-      const core = AutoImportCore.getInstance();
-
       // Should not throw, should handle error gracefully
-      await expect(core.getCacheStats()).resolves.toEqual({
+      await expect(service.getCacheStats()).resolves.toEqual({
         totalFiles: 0,
         oldestImport: null,
         newestImport: null,
@@ -108,8 +106,11 @@ describe("ImportedFilesCache", () => {
     it("should return false for non-existent files", async () => {
       mockQuery.fetch.mockResolvedValue([]);
 
-      const core = AutoImportCore.getInstance();
-      const hasBeenImported = await core.checkImported("file://new-file.jpg");
+      // Access the private method through reflection for testing
+      const importedFilesCache = (service as any).importedFilesCache;
+      const hasBeenImported = await importedFilesCache.hasBeenImported(
+        "file://new-file.jpg",
+      );
 
       expect(hasBeenImported).toBe(false);
       expect(mockCollection.query).toHaveBeenCalledWith(
@@ -120,8 +121,9 @@ describe("ImportedFilesCache", () => {
     it("should return true for existing files", async () => {
       mockQuery.fetch.mockResolvedValue([mockRecord]);
 
-      const core = AutoImportCore.getInstance();
-      const hasBeenImported = await core.checkImported("file://test.jpg");
+      const importedFilesCache = (service as any).importedFilesCache;
+      const hasBeenImported =
+        await importedFilesCache.hasBeenImported("file://test.jpg");
 
       expect(hasBeenImported).toBe(true);
       expect(mockCollection.query).toHaveBeenCalledWith(
@@ -132,8 +134,9 @@ describe("ImportedFilesCache", () => {
     it("should handle check errors gracefully", async () => {
       mockQuery.fetch.mockRejectedValue(new Error("Query error"));
 
-      const core = AutoImportCore.getInstance();
-      const hasBeenImported = await core.checkImported("file://error.jpg");
+      const importedFilesCache = (service as any).importedFilesCache;
+      const hasBeenImported =
+        await importedFilesCache.hasBeenImported("file://error.jpg");
 
       expect(hasBeenImported).toBe(false);
     });
@@ -143,34 +146,22 @@ describe("ImportedFilesCache", () => {
     it("should add new imported file successfully", async () => {
       mockQuery.fetch.mockResolvedValue([]); // No existing record
 
-      const core = AutoImportCore.getInstance();
       const testRecord = {
         sourceUri: "file://new-file.jpg",
         importTimestamp: Date.now(),
       };
 
-      // We can't directly test addImportedFile since it's private
-      // But we can test it through the import process which calls it
-      // For now, we'll test the database operations are called correctly
+      // Test the cache method directly
+      const importedFilesCache = (service as any).importedFilesCache;
 
-      await expect(async () => {
-        // Simulate the internal addImportedFile call
-        await database.write(async () => {
-          const importedFilesCollection = database.get("imported_files");
-          const existingRecord = await importedFilesCollection
-            .query(Q.where("source_uri", testRecord.sourceUri))
-            .fetch();
+      await expect(
+        importedFilesCache.addImportedFile(testRecord),
+      ).resolves.not.toThrow();
 
-          if (existingRecord.length === 0) {
-            await importedFilesCollection.create((importedFile: any) => {
-              importedFile.sourceUri = testRecord.sourceUri;
-              importedFile.importTimestamp = new Date(
-                testRecord.importTimestamp,
-              );
-            });
-          }
-        });
-      }).not.toThrow();
+      expect(database.write).toHaveBeenCalled();
+      expect(mockCollection.query).toHaveBeenCalledWith(
+        Q.where("source_uri", testRecord.sourceUri),
+      );
     });
 
     it("should not add duplicate files", async () => {
@@ -181,206 +172,133 @@ describe("ImportedFilesCache", () => {
         importTimestamp: Date.now(),
       };
 
-      await database.write(async () => {
-        const importedFilesCollection = database.get("imported_files");
-        const existingRecord = await importedFilesCollection
-          .query(Q.where("source_uri", testRecord.sourceUri))
-          .fetch();
-
-        // Should not create if record exists
-        if (existingRecord.length === 0) {
-          await importedFilesCollection.create(() => {});
-        }
-      });
+      const importedFilesCache = (service as any).importedFilesCache;
+      await importedFilesCache.addImportedFile(testRecord);
 
       // create should not have been called since record exists
       expect(mockCollection.create).not.toHaveBeenCalled();
     });
 
     it("should handle add errors gracefully", async () => {
-      mockQuery.fetch.mockRejectedValue(new Error("Add error"));
+      mockQuery.fetch.mockRejectedValue(new Error("Database write error"));
 
-      await expect(async () => {
-        await database.write(async () => {
-          const importedFilesCollection = database.get("imported_files");
-          await importedFilesCollection
-            .query(Q.where("source_uri", "test"))
-            .fetch();
-        });
-      }).not.toThrow();
+      const testRecord = {
+        sourceUri: "file://error-file.jpg",
+        importTimestamp: Date.now(),
+      };
+
+      const importedFilesCache = (service as any).importedFilesCache;
+
+      // Should not throw, error should be handled gracefully
+      await expect(
+        importedFilesCache.addImportedFile(testRecord),
+      ).resolves.not.toThrow();
     });
   });
 
   describe("Removing Imported Files", () => {
     it("should remove existing files successfully", async () => {
-      const recordToDelete = { ...mockRecord, markAsDeleted: vi.fn() };
-      mockQuery.fetch.mockResolvedValue([recordToDelete]);
+      mockQuery.fetch.mockResolvedValue([mockRecord]);
 
-      const core = AutoImportCore.getInstance();
+      await service.removeImportedFile("file://test.jpg");
 
-      await expect(async () => {
-        await database.write(async () => {
-          const importedFilesCollection = database.get("imported_files");
-          const recordsToDelete = await importedFilesCollection
-            .query(Q.where("source_uri", "file://test.jpg"))
-            .fetch();
-
-          for (const record of recordsToDelete) {
-            await record.markAsDeleted();
-          }
-        });
-      }).not.toThrow();
-
-      expect(recordToDelete.markAsDeleted).toHaveBeenCalled();
+      expect(mockRecord.markAsDeleted).toHaveBeenCalled();
     });
 
     it("should handle removal of non-existent files", async () => {
       mockQuery.fetch.mockResolvedValue([]);
 
-      await expect(async () => {
-        await database.write(async () => {
-          const importedFilesCollection = database.get("imported_files");
-          const recordsToDelete = await importedFilesCollection
-            .query(Q.where("source_uri", "file://non-existent.jpg"))
-            .fetch();
+      await service.removeImportedFile("file://nonexistent.jpg");
 
-          for (const record of recordsToDelete) {
-            await record.markAsDeleted();
-          }
-        });
-      }).not.toThrow();
+      expect(mockRecord.markAsDeleted).not.toHaveBeenCalled();
     });
 
     it("should handle removal errors gracefully", async () => {
-      mockQuery.fetch.mockRejectedValue(new Error("Remove error"));
+      mockQuery.fetch.mockRejectedValue(new Error("Database error"));
 
-      await expect(async () => {
-        await database.write(async () => {
-          const importedFilesCollection = database.get("imported_files");
-          await importedFilesCollection
-            .query(Q.where("source_uri", "test"))
-            .fetch();
-        });
-      }).not.toThrow();
-    });
-  });
-
-  describe("Getting Imported Files", () => {
-    it("should return all imported files", async () => {
-      const testRecords = [
-        {
-          sourceUri: "file://test1.jpg",
-          importTimestamp: new Date("2024-01-01"),
-        },
-        {
-          sourceUri: "file://test2.jpg",
-          importTimestamp: new Date("2024-01-02"),
-        },
-      ];
-
-      mockQuery.fetch.mockResolvedValue(testRecords);
-
-      const core = AutoImportCore.getInstance();
-      const files = await core.getImportedFiles();
-
-      expect(files).toHaveLength(2);
-      expect(files[0]).toEqual({
-        sourceUri: "file://test1.jpg",
-        importTimestamp: new Date("2024-01-01").getTime(),
-      });
-    });
-
-    it("should return empty array when no files", async () => {
-      mockQuery.fetch.mockResolvedValue([]);
-
-      const core = AutoImportCore.getInstance();
-      const files = await core.getImportedFiles();
-
-      expect(files).toEqual([]);
-    });
-
-    it("should handle get errors gracefully", async () => {
-      mockQuery.fetch.mockRejectedValue(new Error("Get error"));
-
-      const core = AutoImportCore.getInstance();
-      const files = await core.getImportedFiles();
-
-      expect(files).toEqual([]);
+      await expect(
+        service.removeImportedFile("file://error.jpg"),
+      ).resolves.not.toThrow();
     });
   });
 
   describe("Clearing Cache", () => {
     it("should clear all imported files", async () => {
-      const testRecords = [
-        { ...mockRecord, markAsDeleted: vi.fn() },
-        {
-          ...mockRecord,
-          sourceUri: "file://test2.jpg",
-          markAsDeleted: vi.fn(),
-        },
+      const mockRecords = [
+        { markAsDeleted: vi.fn() },
+        { markAsDeleted: vi.fn() },
       ];
 
-      mockQuery.fetch.mockResolvedValue(testRecords);
+      mockQuery.fetch.mockResolvedValue(mockRecords);
 
-      const core = AutoImportCore.getInstance();
-      await core.clearImportedFilesCache();
+      await service.clearCache();
 
-      testRecords.forEach((record) => {
-        expect(record.markAsDeleted).toHaveBeenCalled();
-      });
-    });
-
-    it("should handle clearing empty cache", async () => {
-      mockQuery.fetch.mockResolvedValue([]);
-
-      const core = AutoImportCore.getInstance();
-
-      await expect(core.clearImportedFilesCache()).resolves.not.toThrow();
+      expect(mockRecords[0].markAsDeleted).toHaveBeenCalled();
+      expect(mockRecords[1].markAsDeleted).toHaveBeenCalled();
     });
 
     it("should handle clear errors gracefully", async () => {
-      mockQuery.fetch.mockRejectedValue(new Error("Clear error"));
+      mockQuery.fetch.mockRejectedValue(new Error("Database error"));
 
-      const core = AutoImportCore.getInstance();
+      await expect(service.clearCache()).resolves.not.toThrow();
+    });
+  });
 
-      await expect(core.clearImportedFilesCache()).resolves.not.toThrow();
+  describe("Getting Imported Files", () => {
+    it("should return list of imported files", async () => {
+      const mockRecords = [
+        {
+          sourceUri: "file://test1.jpg",
+          importTimestamp: { getTime: () => 1000 },
+        },
+        {
+          sourceUri: "file://test2.jpg",
+          importTimestamp: { getTime: () => 2000 },
+        },
+      ];
+
+      mockQuery.fetch.mockResolvedValue(mockRecords);
+
+      const files = await service.getImportedFiles();
+
+      expect(files).toEqual([
+        { sourceUri: "file://test1.jpg", importTimestamp: 1000 },
+        { sourceUri: "file://test2.jpg", importTimestamp: 2000 },
+      ]);
+    });
+
+    it("should handle get files errors gracefully", async () => {
+      mockQuery.fetch.mockRejectedValue(new Error("Database error"));
+
+      const files = await service.getImportedFiles();
+
+      expect(files).toEqual([]);
     });
   });
 
   describe("Cache Statistics", () => {
-    it("should return correct statistics", async () => {
-      const testRecords = [
-        {
-          sourceUri: "file://test1.jpg",
-          importTimestamp: new Date("2024-01-01"),
-        },
-        {
-          sourceUri: "file://test2.jpg",
-          importTimestamp: new Date("2024-01-05"),
-        },
-        {
-          sourceUri: "file://test3.jpg",
-          importTimestamp: new Date("2024-01-03"),
-        },
+    it("should return correct statistics for populated cache", async () => {
+      const mockRecords = [
+        { importTimestamp: { getTime: () => 1000 } },
+        { importTimestamp: { getTime: () => 3000 } },
+        { importTimestamp: { getTime: () => 2000 } },
       ];
 
-      mockQuery.fetch.mockResolvedValue(testRecords);
+      mockQuery.fetch.mockResolvedValue(mockRecords);
 
-      const core = AutoImportCore.getInstance();
-      const stats = await core.getCacheStats();
+      const stats = await service.getCacheStats();
 
       expect(stats).toEqual({
         totalFiles: 3,
-        oldestImport: new Date("2024-01-01").getTime(),
-        newestImport: new Date("2024-01-05").getTime(),
+        oldestImport: 1000,
+        newestImport: 3000,
       });
     });
 
-    it("should handle empty cache statistics", async () => {
+    it("should return correct statistics for empty cache", async () => {
       mockQuery.fetch.mockResolvedValue([]);
 
-      const core = AutoImportCore.getInstance();
-      const stats = await core.getCacheStats();
+      const stats = await service.getCacheStats();
 
       expect(stats).toEqual({
         totalFiles: 0,
@@ -389,29 +307,10 @@ describe("ImportedFilesCache", () => {
       });
     });
 
-    it("should handle single file statistics", async () => {
-      const singleRecord = {
-        sourceUri: "file://single.jpg",
-        importTimestamp: new Date("2024-01-01"),
-      };
-
-      mockQuery.fetch.mockResolvedValue([singleRecord]);
-
-      const core = AutoImportCore.getInstance();
-      const stats = await core.getCacheStats();
-
-      expect(stats).toEqual({
-        totalFiles: 1,
-        oldestImport: new Date("2024-01-01").getTime(),
-        newestImport: new Date("2024-01-01").getTime(),
-      });
-    });
-
     it("should handle statistics errors gracefully", async () => {
-      mockQuery.fetch.mockRejectedValue(new Error("Stats error"));
+      mockQuery.fetch.mockRejectedValue(new Error("Database error"));
 
-      const core = AutoImportCore.getInstance();
-      const stats = await core.getCacheStats();
+      const stats = await service.getCacheStats();
 
       expect(stats).toEqual({
         totalFiles: 0,

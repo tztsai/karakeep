@@ -1,15 +1,13 @@
 /**
- * Auto Import Module
+ * Auto Import Module - Simplified Architecture
  *
- * This module provides auto-import functionality for images with a clean, modular architecture:
- *
- * - AutoImportCore: Minimal core service for background tasks and file operations
- * - useAutoImport: React hook that provides full auto-import functionality using other hooks
- * - useAutoImportLifecycle: App-level lifecycle management hook (used in _layout.tsx)
+ * This module provides auto-import functionality for images with a clean, simplified architecture:
+ * - AutoImportService: Core service for background tasks and file operations
+ * - useAutoImport: Main React hook that provides full auto-import functionality
  * - ImportedFilesCache: WatermelonDB-based cache for tracking imported files
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { Alert, AppState, Platform } from "react-native";
 import ReactNativeBlobUtil from "react-native-blob-util";
 import * as BackgroundTask from "expo-background-task";
@@ -41,48 +39,29 @@ interface ImportedFileRecord {
   importTimestamp: number;
 }
 
-interface AutoImportCallbacks {
-  createBookmark: (params: {
-    type: BookmarkTypes.ASSET;
-    fileName: string;
-    assetId: string;
-    assetType: "image" | "pdf";
-    sourceUrl: string;
-  }) => Promise<void>;
-  uploadAsset: (image: ImportedImage, settings: Settings) => Promise<string>;
-  onImportComplete: (count: number) => void;
-  onError: (error: string) => void;
-}
-
 /**
- * Minimal core service for background tasks and file operations
- * This doesn't use React hooks so it can be called from background contexts
+ * Core auto-import service - handles scanning and importing logic
  */
-class AutoImportCore {
-  private static instance: AutoImportCore;
+class AutoImportService {
+  private static instance: AutoImportService;
   private intervalId: NodeJS.Timeout | null = null;
   private isScanning = false;
-  private callbacks: AutoImportCallbacks | null = null;
   private importedFilesCache: ImportedFilesCache;
 
   private constructor() {
     this.importedFilesCache = ImportedFilesCache.getInstance();
   }
 
-  static getInstance(): AutoImportCore {
-    if (!AutoImportCore.instance) {
-      AutoImportCore.instance = new AutoImportCore();
+  static getInstance(): AutoImportService {
+    if (!AutoImportService.instance) {
+      AutoImportService.instance = new AutoImportService();
     }
-    return AutoImportCore.instance;
+    return AutoImportService.instance;
   }
 
   async initialize() {
     await this.registerBackgroundTask();
     await this.importedFilesCache.initialize();
-  }
-
-  setCallbacks(callbacks: AutoImportCallbacks) {
-    this.callbacks = callbacks;
   }
 
   private async registerBackgroundTask() {
@@ -98,11 +77,13 @@ class AutoImportCore {
   }
 
   async startAutoImport(settings: Settings) {
-    if (!settings.autoImport?.enabled || !settings.autoImport.folderUri) {
+    const folders = settings.autoImport?.folders || [];
+
+    if (!settings.autoImport?.enabled || folders.length === 0) {
+      console.log("Auto-import disabled or no folders configured");
       return;
     }
 
-    // Stop any existing scanning
     this.stopAutoImport();
 
     // Start background task for iOS
@@ -113,7 +94,7 @@ class AutoImportCore {
       });
     }
 
-    // Start foreground interval for both platforms when app is active
+    // Start foreground interval
     const intervalMs = settings.autoImport.scanIntervalMinutes * MINUTES_TO_MS;
     this.intervalId = setInterval(() => {
       this.performScan();
@@ -143,29 +124,23 @@ class AutoImportCore {
       return;
     }
 
-    if (!this.callbacks) {
-      console.warn(
-        "AutoImportCore: Callbacks not set, skipping scan. Ensure useAutoImport is initialized before scan is triggered.",
-      );
-      return;
-    }
-
     this.isScanning = true;
     console.log("Starting auto-import scan...");
 
     try {
-      // Get current settings from SecureStore for background tasks
       const settings = await this.getCurrentSettings();
 
-      if (!settings?.autoImport?.enabled || !settings.autoImport.folderUri) {
-        console.log("Auto-import disabled or no folder selected");
+      if (
+        !settings?.autoImport?.enabled ||
+        !settings.autoImport.folders?.length
+      ) {
+        console.log("Auto-import disabled or no folders configured");
         return;
       }
 
       await this.scanAndImportNewImages(settings);
     } catch (error) {
       console.error("Error during auto-import scan:", error);
-      this.callbacks?.onError?.(`Scan error: ${error}`);
     } finally {
       this.isScanning = false;
     }
@@ -176,103 +151,152 @@ class AutoImportCore {
       const settingsString = await SecureStore.getItemAsync(
         SETTINGS_SECURE_STORE_KEY,
       );
-      if (!settingsString) return null;
-      return JSON.parse(settingsString);
+      return settingsString ? JSON.parse(settingsString) : null;
     } catch (error) {
       console.error("Error getting current settings:", error);
       return null;
     }
   }
 
-  async scanAndImportNewImages(settings: Settings): Promise<void> {
-    try {
-      const folderUri = settings.autoImport?.folderUri;
-      if (!folderUri) {
-        console.log("No folder URI configured");
-        return;
-      }
+  async scanAndImportNewImages(settings: Settings): Promise<number> {
+    const folders = settings.autoImport?.folders || [];
 
-      console.log(`Scanning folder: ${folderUri}`);
-
-      // Get list of files from the selected directory
-      const files = await StorageAccessFramework.readDirectoryAsync(folderUri);
-
-      // Filter for image files
-      const imageFiles = files.filter((uri) => getImageMimeType(uri) !== "");
-
-      const newImages: ImportedImage[] = [];
-
-      for (const fileUri of imageFiles) {
-        try {
-          // Extract filename from URI
-          // Note: This URI parsing to get a filename can be fragile if URI
-          // structures from StorageAccessFramework vary significantly or contain unexpected characters.
-          const filename =
-            fileUri.split(/%3A/).pop()?.replace(/%2F/g, "/") || "";
-
-          // Get file info to check modification time
-          const fileInfo = await getInfoAsync(fileUri);
-
-          // Check if file has been imported using local cache
-          if (fileInfo.exists && !(await this.checkImported(fileUri))) {
-            newImages.push({
-              uri: fileUri,
-              filename: filename,
-              mimeType: getImageMimeType(filename),
-            });
-          }
-        } catch (fileError) {
-          console.error(`Error getting info for file ${fileUri}:`, fileError);
-        }
-      }
-
-      if (newImages.length > 0) {
-        await this.importImages(newImages, settings);
-        this.callbacks?.onImportComplete?.(newImages.length);
-      } else {
-        console.log("No new images found");
-      }
-
-      await this.updateLastScanTimestamp(settings);
-    } catch (error) {
-      console.error("Error scanning for new images:", error);
-      this.callbacks?.onError?.(`Import error: ${error}`);
+    if (folders.length === 0) {
+      console.log("No folders configured for auto-import");
+      return 0;
     }
+
+    console.log(`Scanning ${folders.length} folders for new images`);
+    const allNewImages: ImportedImage[] = [];
+
+    // Scan each folder
+    for (const folder of folders) {
+      try {
+        console.log(`Scanning folder: ${folder.name} (${folder.uri})`);
+        const files = await StorageAccessFramework.readDirectoryAsync(
+          folder.uri,
+        );
+        const imageFiles = files.filter((uri) => getImageMimeType(uri) !== "");
+
+        for (const fileUri of imageFiles) {
+          try {
+            const filename =
+              fileUri.split(/%3A/).pop()?.replace(/%2F/g, "/") || "";
+            const fileInfo = await getInfoAsync(fileUri);
+
+            if (
+              fileInfo.exists &&
+              !(await this.importedFilesCache.hasBeenImported(fileUri))
+            ) {
+              allNewImages.push({
+                uri: fileUri,
+                filename: filename,
+                mimeType: getImageMimeType(filename),
+              });
+            }
+          } catch (fileError) {
+            console.error(`Error getting info for file ${fileUri}:`, fileError);
+          }
+        }
+      } catch (folderError) {
+        console.error(`Error scanning folder ${folder.name}:`, folderError);
+      }
+    }
+
+    if (allNewImages.length > 0) {
+      console.log(`Found ${allNewImages.length} new images across all folders`);
+      await this.importImages(allNewImages, settings);
+      await this.updateLastScanTimestamp(settings);
+    } else {
+      console.log("No new images found in any folder");
+    }
+
+    return allNewImages.length;
   }
 
   private async importImages(images: ImportedImage[], settings: Settings) {
-    if (!this.callbacks) {
-      console.error("No callbacks set for import operations");
-      return;
-    }
-
     for (const image of images) {
       try {
         console.log(`Importing image: ${image.filename}`);
 
-        // Upload asset using callback
-        const assetId = await this.callbacks.uploadAsset(image, settings);
+        // Upload asset
+        const assetId = await this.uploadAsset(image, settings);
 
-        // Create bookmark using callback
-        await this.callbacks.createBookmark({
-          type: BookmarkTypes.ASSET,
-          fileName: image.filename,
-          assetId: assetId,
-          assetType: "image",
-          sourceUrl: image.uri,
-        });
+        // Create bookmark
+        await this.createBookmark(
+          {
+            type: BookmarkTypes.ASSET,
+            fileName: image.filename,
+            assetId: assetId,
+            assetType: "image",
+            sourceUrl: image.uri,
+          },
+          settings,
+        );
 
-        // Add to local cache to prevent re-importing
+        // Add to cache
         await this.importedFilesCache.addImportedFile({
           sourceUri: image.uri,
           importTimestamp: Date.now(),
         });
       } catch (error) {
         console.error(`Error importing image ${image.filename}:`, error);
-        this.callbacks?.onError?.(
-          `Failed to import ${image.filename}: ${error}`,
-        );
       }
+    }
+  }
+
+  private async uploadAsset(
+    image: ImportedImage,
+    settings: Settings,
+  ): Promise<string> {
+    const resp = await ReactNativeBlobUtil.fetch(
+      "POST",
+      `${settings.address}/api/assets`,
+      {
+        Authorization: `Bearer ${settings.apiKey}`,
+        "Content-Type": "multipart/form-data",
+      },
+      [
+        {
+          name: "file",
+          filename: image.filename,
+          type: image.mimeType,
+          data: ReactNativeBlobUtil.wrap(image.uri.replace("file://", "")),
+        },
+      ],
+    );
+
+    const uploadResult = zUploadResponseSchema.parse(await resp.json());
+    console.log(
+      `Successfully uploaded asset: ${image.filename}, assetId: ${uploadResult.assetId}`,
+    );
+    return uploadResult.assetId;
+  }
+
+  private async createBookmark(
+    params: {
+      type: BookmarkTypes.ASSET;
+      fileName: string;
+      assetId: string;
+      assetType: "image" | "pdf";
+      sourceUrl: string;
+    },
+    settings: Settings,
+  ) {
+    // This method will be overridden when used with React hooks
+    // For background operations, we'll make a direct API call
+    try {
+      await fetch(`${settings.address}/api/bookmarks`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${settings.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(params),
+      });
+    } catch (error) {
+      console.error("Error creating bookmark:", error);
+      throw error;
     }
   }
 
@@ -294,166 +318,57 @@ class AutoImportCore {
     }
   }
 
-  // Public methods for cache management
+  // Cache management methods
   async getCacheStats() {
     return await this.importedFilesCache.getStats();
   }
-
-  async clearImportedFilesCache() {
+  async clearCache() {
     await this.importedFilesCache.clearCache();
   }
-
   async getImportedFiles() {
     return await this.importedFilesCache.getImportedFiles();
   }
-
-  async checkImported(sourceUri: string) {
-    return await this.importedFilesCache.hasBeenImported(sourceUri);
-  }
-
-  async removeImportedFile(sourceUri: string) {
-    await this.importedFilesCache.removeImportedFile(sourceUri);
+  async removeImportedFile(uri: string) {
+    await this.importedFilesCache.removeImportedFile(uri);
   }
 }
 
 /**
- * React hook for auto-import functionality
- * Uses other hooks like useCreateBookmark, useAppSettings, and ReactNativeBlobUtil for uploads
+ * Main React hook for auto-import functionality
  */
 export function useAutoImport() {
-  const { settings } = useAppSettings();
+  const { settings, setSettings } = useAppSettings();
   const createBookmarkMutation = api.bookmarks.createBookmark.useMutation();
-  const core = AutoImportCore.getInstance();
-  const callbacksRef = useRef<AutoImportCallbacks | null>(null);
+  const service = AutoImportService.getInstance();
 
-  // Create stable callback functions that use the hooks
-  const createBookmark = useCallback(
-    async (params: {
-      type: BookmarkTypes.ASSET;
-      fileName: string;
-      assetId: string;
-      assetType: "image" | "pdf";
-      sourceUrl: string;
-    }) => {
-      await createBookmarkMutation.mutateAsync({
-        type: BookmarkTypes.ASSET,
-        fileName: params.fileName,
-        assetId: params.assetId,
-        assetType: params.assetType,
-        sourceUrl: params.sourceUrl,
-      });
-    },
-    [createBookmarkMutation],
-  );
-
-  const uploadAsset = useCallback(
-    async (image: ImportedImage, settings: Settings): Promise<string> => {
-      try {
-        console.log(`Uploading asset: ${image.filename}`);
-
-        // Upload the asset using ReactNativeBlobUtil
-        const resp = await ReactNativeBlobUtil.fetch(
-          "POST",
-          `${settings.address}/api/assets`,
-          {
-            Authorization: `Bearer ${settings.apiKey}`,
-            "Content-Type": "multipart/form-data",
-          },
-          [
-            {
-              name: "file",
-              filename: image.filename,
-              type: image.mimeType,
-              data: ReactNativeBlobUtil.wrap(image.uri.replace("file://", "")),
-            },
-          ],
-        );
-
-        // Parse the response
-        const uploadResult = zUploadResponseSchema.parse(await resp.json());
-        console.log(
-          `Successfully uploaded asset: ${image.filename}, assetId: ${uploadResult.assetId}`,
-        );
-
-        return uploadResult.assetId;
-      } catch (error) {
-        console.error(`Error uploading asset ${image.filename}:`, error);
-        throw error;
-      }
-    },
-    [],
-  );
-
-  const onImportComplete = useCallback((count: number) => {
-    Alert.alert("Import Complete", `Successfully imported ${count} new images`);
-  }, []);
-
-  const onError = useCallback((error: string) => {
-    Alert.alert("Import Error", error);
-  }, []);
-
-  // Update callbacks when they change
+  // Override the createBookmark method for React context
   useEffect(() => {
-    const callbacks: AutoImportCallbacks = {
-      createBookmark,
-      uploadAsset,
-      onImportComplete,
-      onError,
+    const originalCreateBookmark = service["createBookmark"].bind(service);
+    service["createBookmark"] = async (params: any) => {
+      await createBookmarkMutation.mutateAsync(params);
     };
-    callbacksRef.current = callbacks;
-    core.setCallbacks(callbacks);
-  }, [createBookmark, uploadAsset, onImportComplete, onError, core]);
 
-  // Initialize core on mount
+    return () => {
+      service["createBookmark"] = originalCreateBookmark;
+    };
+  }, [createBookmarkMutation, service]);
+
+  // Initialize service
   useEffect(() => {
-    core.initialize();
-  }, [core]);
+    service.initialize();
+  }, [service]);
 
-  // Exposed hook interface
-  return {
-    startAutoImport: useCallback(
-      () => core.startAutoImport(settings),
-      [core, settings],
-    ),
-    stopAutoImport: useCallback(() => core.stopAutoImport(), [core]),
-    scanNow: useCallback(
-      () => core.scanAndImportNewImages(settings),
-      [core, settings],
-    ),
-    getCacheStats: useCallback(() => core.getCacheStats(), [core]),
-    clearCache: useCallback(() => core.clearImportedFilesCache(), [core]),
-    getImportedFiles: useCallback(() => core.getImportedFiles(), [core]),
-    removeImportedFile: useCallback(
-      (uri: string) => core.removeImportedFile(uri),
-      [core],
-    ),
-    isEnabled: settings.autoImport?.enabled ?? false,
-    folderUri: settings.autoImport?.folderUri,
-    scanInterval: settings.autoImport?.scanIntervalMinutes ?? 60,
-  };
-}
-
-// New hook for managing auto-import lifecycle in the app
-export function useAutoImportLifecycle() {
-  const { settings } = useAppSettings();
-  const core = AutoImportCore.getInstance();
-
+  // Handle app lifecycle and auto-import management
   useEffect(() => {
-    // Initialize the service
-    core.initialize();
-
-    // Start auto-import if enabled
     if (settings.autoImport?.enabled) {
-      core.startAutoImport(settings);
+      service.startAutoImport(settings);
+    } else {
+      service.stopAutoImport();
     }
 
-    // Handle app state changes
     const handleAppStateChange = (nextAppState: string) => {
       if (nextAppState === "active" && settings.autoImport?.enabled) {
-        core.startAutoImport(settings);
-      } else if (nextAppState === "background" || nextAppState === "inactive") {
-        // Keep running in background for iOS, stop for Android
-        // The background task will handle iOS
+        service.startAutoImport(settings);
       }
     };
 
@@ -464,20 +379,60 @@ export function useAutoImportLifecycle() {
 
     return () => {
       subscription?.remove();
-      core.stopAutoImport();
+      service.stopAutoImport();
     };
   }, [
     settings.autoImport?.enabled,
     settings.autoImport?.scanIntervalMinutes,
-    settings.autoImport?.folderUri,
-    core,
+    settings.autoImport?.folders,
+    service,
   ]);
+
+  // Manual scan function with UI feedback
+  const scanNow = useCallback(async () => {
+    try {
+      const count = await service.scanAndImportNewImages(settings);
+      if (count > 0) {
+        Alert.alert(
+          "Import Complete",
+          `Successfully imported ${count} new images`,
+        );
+        // Update settings to reflect the scan
+        await setSettings({
+          ...settings,
+          autoImport: {
+            ...settings.autoImport!,
+            lastScanTimestamp: Date.now(),
+          },
+        });
+      } else {
+        Alert.alert("Scan Complete", "No new images found");
+      }
+    } catch (error) {
+      Alert.alert("Import Error", `Failed to scan: ${error}`);
+    }
+  }, [service, settings, setSettings]);
+
+  return {
+    scanNow,
+    getCacheStats: useCallback(() => service.getCacheStats(), [service]),
+    clearCache: useCallback(() => service.clearCache(), [service]),
+    getImportedFiles: useCallback(() => service.getImportedFiles(), [service]),
+    removeImportedFile: useCallback(
+      (uri: string) => service.removeImportedFile(uri),
+      [service],
+    ),
+    isEnabled: settings.autoImport?.enabled ?? false,
+    folders: settings.autoImport?.folders ?? [],
+    scanInterval: settings.autoImport?.scanIntervalMinutes ?? 60,
+  };
 }
 
+/**
+ * Cache management using WatermelonDB
+ */
 class ImportedFilesCache {
   private static instance: ImportedFilesCache;
-
-  private constructor() {}
 
   static getInstance(): ImportedFilesCache {
     if (!ImportedFilesCache.instance) {
@@ -488,8 +443,6 @@ class ImportedFilesCache {
 
   async initialize(): Promise<void> {
     try {
-      // WatermelonDB handles initialization automatically
-      // No need to manually load data like with SecureStore
       const importedFilesCollection =
         database.get<ImportedFile>("imported_files");
       const count = await importedFilesCollection.query().fetchCount();
@@ -518,8 +471,6 @@ class ImportedFilesCache {
       await database.write(async () => {
         const importedFilesCollection =
           database.get<ImportedFile>("imported_files");
-
-        // Check if record already exists to avoid duplicates
         const existingRecord = await importedFilesCollection
           .query(Q.where("source_uri", record.sourceUri))
           .fetch();
@@ -527,11 +478,9 @@ class ImportedFilesCache {
         if (existingRecord.length === 0) {
           await importedFilesCollection.create((importedFile) => {
             importedFile.sourceUri = record.sourceUri;
-            importedFile.importTimestamp = new Date(record.importTimestamp);
           });
         }
       });
-      console.log(`Added imported file record: ${record.sourceUri}`);
     } catch (error) {
       console.error("Error adding imported file record:", error);
     }
@@ -550,7 +499,6 @@ class ImportedFilesCache {
           await record.markAsDeleted();
         }
       });
-      console.log(`Removed imported file record: ${sourceUri}`);
     } catch (error) {
       console.error("Error removing imported file record:", error);
     }
@@ -561,7 +509,6 @@ class ImportedFilesCache {
       const importedFilesCollection =
         database.get<ImportedFile>("imported_files");
       const records = await importedFilesCollection.query().fetch();
-
       return records.map((record) => ({
         sourceUri: record.sourceUri,
         importTimestamp: record.importTimestamp.getTime(),
@@ -578,7 +525,6 @@ class ImportedFilesCache {
         const importedFilesCollection =
           database.get<ImportedFile>("imported_files");
         const allRecords = await importedFilesCollection.query().fetch();
-
         for (const record of allRecords) {
           await record.markAsDeleted();
         }
@@ -598,7 +544,6 @@ class ImportedFilesCache {
       const importedFilesCollection =
         database.get<ImportedFile>("imported_files");
       const records = await importedFilesCollection.query().fetch();
-
       const timestamps = records.map((r) => r.importTimestamp.getTime());
 
       return {
@@ -608,11 +553,7 @@ class ImportedFilesCache {
       };
     } catch (error) {
       console.error("Error getting imported files stats:", error);
-      return {
-        totalFiles: 0,
-        oldestImport: null,
-        newestImport: null,
-      };
+      return { totalFiles: 0, oldestImport: null, newestImport: null };
     }
   }
 }
@@ -636,4 +577,4 @@ function getImageMimeType(filename: string): string {
   }
 }
 
-export default AutoImportCore;
+export default AutoImportService;
