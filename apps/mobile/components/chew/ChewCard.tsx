@@ -1,4 +1,4 @@
-import { Image, Pressable, Text, View } from "react-native";
+import { Image, ImageURISource, Pressable, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { TailwindResolver } from "@/components/TailwindResolver";
 import {
@@ -16,7 +16,7 @@ interface ChewCardProps {
     type: "link" | "text" | "image" | "asset";
     url?: string;
     note?: string;
-    imageUrl?: string;
+    imageSource?: ImageURISource;
     createdAt: Date;
     tags?: string[];
     favourited?: boolean;
@@ -76,9 +76,9 @@ export default function ChewCard({ bookmark, onTagging }: ChewCardProps) {
           {bookmark.title}
         </Text>
 
-        {bookmark.imageUrl && (
+        {bookmark.imageSource && (
           <Image
-            source={{ uri: bookmark.imageUrl }}
+            source={bookmark.imageSource}
             className="mb-3 h-48 w-full rounded-lg"
             resizeMode="cover"
           />
