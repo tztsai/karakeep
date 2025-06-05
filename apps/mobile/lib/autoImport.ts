@@ -166,7 +166,6 @@ class AutoImportService {
       return 0;
     }
 
-    console.log(`Scanning ${folders.length} folders for new images`);
     const allNewImages: ImportedImage[] = [];
 
     // Scan each folder
@@ -180,16 +179,17 @@ class AutoImportService {
 
         for (const fileUri of imageFiles) {
           try {
-            const filename =
-              fileUri.split(/%3A/).pop()?.replace(/%2F/g, "/") || "";
             const fileInfo = await getInfoAsync(fileUri);
+            const uri = decodeURIComponent(fileUri);
+            const filename = uri.split(":").pop() ?? "";
+            console.log("Importing", uri);
 
             if (
               fileInfo.exists &&
-              !(await this.importedFilesCache.hasBeenImported(fileUri))
+              !(await this.importedFilesCache.hasBeenImported(uri))
             ) {
               allNewImages.push({
-                uri: fileUri,
+                uri: uri,
                 filename: filename,
                 mimeType: getImageMimeType(filename),
               });
@@ -249,6 +249,15 @@ class AutoImportService {
     image: ImportedImage,
     settings: Settings,
   ): Promise<string> {
+    const fileData = {
+      name: "file",
+      filename: image.filename,
+      type: image.mimeType,
+      data: image.uri.startsWith("content://")
+        ? image.uri
+        : ReactNativeBlobUtil.wrap(image.uri.replace("file://", "")),
+    };
+
     const resp = await ReactNativeBlobUtil.fetch(
       "POST",
       `${settings.address}/api/assets`,
@@ -256,14 +265,7 @@ class AutoImportService {
         Authorization: `Bearer ${settings.apiKey}`,
         "Content-Type": "multipart/form-data",
       },
-      [
-        {
-          name: "file",
-          filename: image.filename,
-          type: image.mimeType,
-          data: ReactNativeBlobUtil.wrap(image.uri.replace("file://", "")),
-        },
-      ],
+      [fileData],
     );
 
     const uploadResult = zUploadResponseSchema.parse(await resp.json());

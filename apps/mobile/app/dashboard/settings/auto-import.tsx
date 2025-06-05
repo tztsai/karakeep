@@ -158,51 +158,6 @@ export default function AutoImportPage() {
     }
   };
 
-  const clearAllFolders = async () => {
-    Alert.alert(
-      "Clear All Folders",
-      "Are you sure you want to remove all folders from auto-import?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear All",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // Release directory access for all folders
-              const folderUris = folders
-                .filter((f) => f.bookmarkStatus === "success")
-                .map((f) => f.uri);
-
-              if (folderUris.length > 0) {
-                await releaseLongTermAccess(folderUris); // Android
-                await releaseSecureAccess(folderUris); // iOS
-              }
-
-              await setSettings({
-                ...settings,
-                autoImport: {
-                  ...autoImport,
-                  folders: [],
-                },
-              });
-            } catch (error) {
-              console.log("Note: Could not release directory access:", error);
-              // Still clear the folders from settings
-              await setSettings({
-                ...settings,
-                autoImport: {
-                  ...autoImport,
-                  folders: [],
-                },
-              });
-            }
-          },
-        },
-      ],
-    );
-  };
-
   const startScan = async () => {
     setIsScanning(true);
 
@@ -282,9 +237,9 @@ export default function AutoImportPage() {
                     <Pressable
                       onPress={() => removeFolder(folder.uri)}
                       disabled={!autoImport.enabled || isLoading}
-                      className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 disabled:opacity-50"
+                      className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 disabled:opacity-50"
                     >
-                      <X size={12} color="white" />
+                      <X size={13} color="white" />
                     </Pressable>
                   </View>
                 ))}
